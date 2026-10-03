@@ -6,29 +6,21 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
 from bot.service import ReceiptService
+from bot.texts import Texts
 
 logger = logging.getLogger(__name__)
 
 router = Router()
 
-START_TEXT = "Привет! Пришлите фото чека, и я посчитаю покупки по категориям.\nСписок команд: /help"
-HELP_TEXT = (
-    "Отправьте фото чека, чтобы сохранить покупку.\n"
-    "/month — расходы за текущий месяц\n"
-    "/help — эта справка"
-)
-UNKNOWN_TEXT = "Я понимаю только фото чеков. Список команд: /help"
-ERROR_TEXT = "Не получилось обработать чек. Попробуйте ещё раз позже."
-
 
 @router.message(CommandStart())
-async def handle_start(message: Message) -> None:
-    await message.answer(START_TEXT)
+async def handle_start(message: Message, texts: Texts) -> None:
+    await message.answer(texts.start)
 
 
 @router.message(Command("help"))
-async def handle_help(message: Message) -> None:
-    await message.answer(HELP_TEXT)
+async def handle_help(message: Message, texts: Texts) -> None:
+    await message.answer(texts.help)
 
 
 @router.message(Command("month"))
@@ -39,7 +31,7 @@ async def handle_month(message: Message, service: ReceiptService) -> None:
 
 
 @router.message(F.photo)
-async def handle_photo(message: Message, bot: Bot, service: ReceiptService) -> None:
+async def handle_photo(message: Message, bot: Bot, service: ReceiptService, texts: Texts) -> None:
     if message.from_user is None or not message.photo:
         return
     buffer = BytesIO()
@@ -48,10 +40,10 @@ async def handle_photo(message: Message, bot: Bot, service: ReceiptService) -> N
         reply = await service.process_photo(message.from_user.id, buffer.getvalue())
     except Exception:
         logger.exception("Failed to process receipt photo")
-        reply = ERROR_TEXT
+        reply = texts.error
     await message.answer(reply)
 
 
 @router.message()
-async def handle_unknown(message: Message) -> None:
-    await message.answer(UNKNOWN_TEXT)
+async def handle_unknown(message: Message, texts: Texts) -> None:
+    await message.answer(texts.unknown)

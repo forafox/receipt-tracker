@@ -1,13 +1,8 @@
 from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock
 
-from bot.handlers import (
-    ERROR_TEXT,
-    START_TEXT,
-    handle_month,
-    handle_photo,
-    handle_start,
-)
+from bot.handlers import handle_month, handle_photo, handle_start
+from bot.texts import EN, RU
 
 
 class FakeService:
@@ -45,9 +40,9 @@ def make_bot(content: bytes) -> MagicMock:
 async def test_start_sends_greeting() -> None:
     message = make_message()
 
-    await handle_start(message)
+    await handle_start(message, RU)
 
-    message.answer.assert_awaited_once_with(START_TEXT)
+    message.answer.assert_awaited_once_with(RU.start)
 
 
 async def test_month_returns_report_for_user() -> None:
@@ -63,7 +58,7 @@ async def test_photo_passes_largest_size_to_service() -> None:
     bot = make_bot(b"image")
     service = FakeService()
 
-    await handle_photo(message, bot, service)
+    await handle_photo(message, bot, service, EN)
 
     assert bot.download.await_args.args[0] is message.photo[-1]
     assert service.received == (42, b"image")
@@ -73,6 +68,6 @@ async def test_photo_passes_largest_size_to_service() -> None:
 async def test_photo_reports_error_when_service_fails() -> None:
     message = make_message()
 
-    await handle_photo(message, make_bot(b"image"), FakeService(RuntimeError("boom")))
+    await handle_photo(message, make_bot(b"image"), FakeService(RuntimeError("boom")), EN)
 
-    message.answer.assert_awaited_once_with(ERROR_TEXT)
+    message.answer.assert_awaited_once_with(EN.error)
