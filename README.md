@@ -21,6 +21,14 @@
 
 Подробное описание: [docs/architecture.pdf](docs/architecture.pdf).
 
+## Запуск бота
+
+```bash
+uv sync
+cp .env.example .env  # вписать токен бота в BOT_TOKEN
+uv run python -m bot
+```
+
 ## Команда
 
 - Андрей Карабанов
