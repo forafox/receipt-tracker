@@ -27,3 +27,6 @@ htmlcov/
 # Local data
 *.sqlite
 *.db
+
+# Data
+dataset/
