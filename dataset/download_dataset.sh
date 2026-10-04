@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="https://huggingface.co/datasets/abdoelsayed/CORU/resolve/main"
+CORU_REPO="abdoelsayed/CORU"
+RU_REPO="cdek-ocr/receipt-ocr-ru"
 
 is_valid() {
     local file="$1"
@@ -12,7 +13,7 @@ is_valid() {
             unzip -tq "$file" >/dev/null 2>&1
             ;;
         *.json)
-            python -c "import json,sys; json.load(open(sys.argv[1]))" "$file" >/dev/null 2>&1
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$file" >/dev/null 2>&1
             ;;
         *)
             return 0
@@ -21,20 +22,29 @@ is_valid() {
 }
 
 download() {
-    local url="$1"
-    local file="$2"
+    local repo="$1"
+    local repo_path="$2"
+    local dir="$3"
+    local name
+    name="$(basename "$repo_path")"
 
-    if [[ -f "$file" ]]; then
-        if is_valid "$file"; then
-            echo "Skipping $file (already downloaded and valid)"
-            return 0
-        fi
-        echo "Existing $file is invalid, re-downloading"
-        rm -f "$file"
+    mkdir -p "$dir"
+
+    if [[ -f "$dir/$name" ]] && is_valid "$dir/$name"; then
+        echo "Skipping $dir/$name (already downloaded and valid)"
+        return 0
     fi
 
-    echo "Downloading $file"
-    wget -q --show-progress -O "$file" "$url"
+    echo "Downloading $dir/$name"
+    hf download "$repo" \
+        --repo-type dataset \
+        --include "$repo_path" \
+        --local-dir "$dir"
+
+    if [[ "$dir/$repo_path" != "$dir/$name" ]]; then
+        mv -f "$dir/$repo_path" "$dir/$name"
+        rmdir -p --ignore-fail-on-non-empty "$dir/$(dirname "$repo_path")" 2>/dev/null || true
+    fi
 }
 
 unzip_if_needed() {
@@ -54,23 +64,29 @@ download_recognition() {
     local name="$1"
     local dir="$2"
 
-    mkdir -p "$dir"
-    cd "$dir"
-    download "$BASE_URL/OCR/$name.zip" "$name.zip"
-    unzip_if_needed "$name.zip"
-    cd - >/dev/null
+    download "$CORU_REPO" "OCR/$name.zip" "$dir"
+    unzip_if_needed "$dir/$name.zip"
 }
 
 download_receipt() {
     local name="$1"
     local dir="$2"
 
+    download "$CORU_REPO" "Receipt/$name.zip" "$dir"
+    download "$CORU_REPO" "Receipt/$name.json" "$dir"
+    unzip_if_needed "$dir/$name.zip"
+}
+
+download_ru() {
+    local name="$1"
+    local dir="$2"
+
     mkdir -p "$dir"
-    cd "$dir"
-    download "$BASE_URL/Receipt/$name.zip" "$name.zip"
-    download "$BASE_URL/Receipt/$name.json" "$name.json"
-    unzip_if_needed "$name.zip"
-    cd - >/dev/null
+    hf download "$RU_REPO" \
+        --repo-type dataset \
+        --include "images/$name/*" \
+        --include "annotations/$name.jsonl" \
+        --local-dir "$dir"
 }
 
 mkdir -p recognition/eng_arab
@@ -79,7 +95,12 @@ for split in test train val; do
 done
 
 mkdir -p detection/eng_arab
-download "$BASE_URL/Receipt/labels.txt" "detection/eng_arab/labels.txt"
+download "$CORU_REPO" "Receipt/labels.txt" "detection/eng_arab"
 for split in test val; do
     download_receipt "$split" "detection/eng_arab"
+done
+
+mkdir -p detection/ru
+for split in test train validation; do
+    download_ru "$split" "detection/ru"
 done
