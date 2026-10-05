@@ -28,6 +28,12 @@ class ClassifiedItem(Item):
     confidence: float = Field(ge=0, le=1)
 
 
+class ClassifiedReceipt(BaseModel):
+    receipt_id: str = Field(min_length=1)
+    purchased_at: datetime
+    items: list[ClassifiedItem] = Field(min_length=1)
+
+
 class ReceiptCategorySummary(BaseModel):
     category: str
     total: Decimal

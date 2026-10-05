@@ -36,6 +36,11 @@
 Общие модели данных лежат в `common/`. Модули должны общаться через эти
 контракты, а не импортировать внутренние реализации друг друга.
 
+Важная граница: M3 не принимает фото и не работает напрямую с OCR. Между OCR и
+классификатором стоит M2 Extract. OCR возвращает распознанный текст и
+координаты, M2 превращает этот результат в структурированный `Receipt`, и
+только после этого M3 классифицирует позиции.
+
 ## Структура ветки
 
 Ветка `uvusibuneka` содержит реализованный модуль M3 и общие контракты,
@@ -97,6 +102,24 @@ uv.lock                      # lock-файл uv
 
 Деньги хранятся через `Decimal`, даты — timezone-aware `datetime`.
 
+`ClassifiedReceipt` — публичный результат M3 для M4:
+
+```json
+{
+  "receipt_id": "r-1",
+  "purchased_at": "2026-10-03T10:00:00+03:00",
+  "items": [
+    {
+      "name": "молоко цельное",
+      "quantity": "1",
+      "total": "89.90",
+      "category": "food",
+      "confidence": 0.93
+    }
+  ]
+}
+```
+
 ## M3: классификатор категорий
 
 M3 реализован в пакете `categorize/`.
@@ -104,6 +127,7 @@ M3 реализован в пакете `categorize/`.
 Компоненты:
 
 - `classifier.py` — протокол `CategoryClassifier`;
+- `interfaces.py` — публичный протокол `ReceiptCategorizer` для связи M2/M4 с M3;
 - `transformer.py` — inference обученной transformer-модели;
 - `training.py` — fine-tuning transformer-модели;
 - `external_dataset.py` — загрузка внешнего датасета с Hugging Face;
@@ -305,6 +329,46 @@ uv run fastapi run categorize/api.py --host 0.0.0.0 --port 8000
       "total": "55",
       "category": "food",
       "confidence": 0.94
+    }
+  ]
+}
+```
+
+### `POST /classify/receipt`
+
+Основной интеграционный endpoint для пайплайна M2 → M3. Принимает
+структурированный чек, который должен вернуть M2 Extract, и возвращает тот же
+чек с категориями и confidence на каждой позиции.
+
+Запрос:
+
+```json
+{
+  "receipt_id": "r-1",
+  "purchased_at": "2026-10-03T10:00:00+03:00",
+  "items": [
+    {
+      "name": "молоко цельное",
+      "quantity": "1",
+      "total": "89.90"
+    }
+  ]
+}
+```
+
+Ответ:
+
+```json
+{
+  "receipt_id": "r-1",
+  "purchased_at": "2026-10-03T10:00:00+03:00",
+  "items": [
+    {
+      "name": "молоко цельное",
+      "quantity": "1",
+      "total": "89.90",
+      "category": "food",
+      "confidence": 0.93
     }
   ]
 }

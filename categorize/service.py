@@ -1,5 +1,5 @@
 from categorize.classifier import CategoryClassifier
-from common import ClassifiedItem, Item
+from common import ClassifiedItem, ClassifiedReceipt, Item, Receipt
 
 
 class CategoryService:
@@ -18,3 +18,10 @@ class CategoryService:
 
     def classify_items(self, items: list[Item]) -> list[ClassifiedItem]:
         return [self.classify_item(item) for item in items]
+
+    def classify_receipt(self, receipt: Receipt) -> ClassifiedReceipt:
+        return ClassifiedReceipt(
+            receipt_id=receipt.receipt_id,
+            purchased_at=receipt.purchased_at,
+            items=self.classify_items(receipt.items),
+        )

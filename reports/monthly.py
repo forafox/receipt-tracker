@@ -1,10 +1,10 @@
 from collections import defaultdict
 from decimal import Decimal
 
-from common import ClassifiedItem, MonthlyReport, Receipt, ReceiptCategorySummary
+from common import ClassifiedReceipt, MonthlyReport, ReceiptCategorySummary
 
 
-def build_monthly_report(receipts: list[Receipt]) -> MonthlyReport:
+def build_monthly_report(receipts: list[ClassifiedReceipt]) -> MonthlyReport:
     if not receipts:
         msg = "monthly report requires at least one receipt"
         raise ValueError(msg)
@@ -19,9 +19,6 @@ def build_monthly_report(receipts: list[Receipt]) -> MonthlyReport:
             msg = "all receipts must belong to the same month"
             raise ValueError(msg)
         for item in receipt.items:
-            if not isinstance(item, ClassifiedItem):
-                msg = "receipt items must be classified before reporting"
-                raise TypeError(msg)
             totals[item.category] += item.total
             counts[item.category] += 1
 
