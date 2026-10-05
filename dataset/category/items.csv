@@ -1,0 +1,23 @@
+text,category
+молоко 3.2%,food
+хлеб бородинский,food
+сыр гауда,food
+яблоки сезонные,food
+куриная грудка,food
+картофель молодой,food
+стиральный порошок,household
+средство для посуды,household
+гель для стирки,household
+бумажные полотенца,household
+мыло жидкое,household
+зубная паста,personal_care
+шампунь,personal_care
+гель для душа,personal_care
+дезодорант,personal_care
+парацетамол,medicine
+витамин c,medicine
+бинт стерильный,medicine
+капли от насморка,medicine
+кофе американо,cafe
+сэндвич с курицей,cafe
+бизнес ланч,cafe

@@ -1,0 +1,323 @@
+text,category
+молоко 3.2%,food
+хлеб бородинский,food
+сыр гауда,food
+яблоки сезонные,food
+куриная грудка,food
+картофель молодой,food
+стиральный порошок,household
+средство для посуды,household
+гель для стирки,household
+бумажные полотенца,household
+мыло жидкое,household
+зубная паста,personal_care
+шампунь,personal_care
+гель для душа,personal_care
+дезодорант,personal_care
+парацетамол,medicine
+витамин c,medicine
+бинт стерильный,medicine
+капли от насморка,medicine
+кофе американо,cafe
+сэндвич с курицей,cafe
+бизнес ланч,cafe
+"Cappy Портокал | Cappy | 250 ml | beverages, fruit based beverages, fruit juices, fruit juices from concentrate, juices and nectars, orange juices, orange juices from concentrate, plant based beverage",food
+"Арахис в скорлупе | nuts, nuts and their products, peanuts, plant based foods, plant based foods and beverages",food
+"ПИДЕ с квас | Kaufland | 500 г | breads, cereals and potatoes, plant based foods, plant based foods and beverages, sourdough pita bread, special breads, пита с квас",food
+"Кешью сырой сушеный | Ozon fresh | 1000 g | cashew nuts, nuts, nuts and their products, plant based foods, plant based foods and beverages",food
+"Арахис жареный соленый | Ozon fresh | 1000 g | legumes, legumes and their products, nuts, nuts and their products, peanuts, plant based foods, plant based foods and beverages",food
+"Сормовское сливочное печенье | 50грамм | biscuits, biscuits and cakes, biscuits and crackers, snacks, sweet snacks",food
+"Hаленчовская Слива. Шоколадные Конфеты | Colian | 350 g | chocolates, cocoa and its products, snacks, sweet snacks",food
+"соломка сладкая | ООО КУБАНСКИЙ КОМБИНАТ ХЛЕБОПРОДУКТОВ | 200 | biscuits, biscuits and cakes, drop cookies, snacks, sweet snacks",food
+"Tunа Chunks in Spring Water | Sainsbury's | 580g (4 x 145g) | canned fishes, canned foods, canned tunas, fatty fishes, fishes, fishes and their products, seafood, tuna chunks, tunas",food
+"Йогурт &quot;Густой Греческий&quot; | Простоквашино | 135 г | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, greek style yogurts, yogurts",food
+"Хаварти с халапеньо | Castello | 227 g | cheeses, cow cheeses, dairies, danish cheeses, fermented foods, fermented milk products, havarti",food
+"Хаварти с подправки | Castello | 227 g | cheeses, cow cheeses, dairies, danish cheeses, fermented foods, fermented milk products, havarti",food
+"Вафли Сдобная особа мягкие с суфле классические | 100g | biscuits and cakes, pastries, snacks, sweet snacks, waffles",food
+"Гречневые хлопья Алтайская сказка | 100g | breakfast cereals, breakfasts, cereal flakes, cereals and potatoes, cereals and their products, flakes, plant based foods, plant based foods and beverages",food
+"Даниссимо Пинаколада | 100g | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, yogurts",food
+"Десерт Мороженое в рожке Летнее KFC | 100g | desserts, frozen desserts, frozen foods",food
+"Килька обжаренная в томатном соусе | 100g | canned fishes, canned foods, fishes, fishes and their products, seafood",food
+"Лосось | Свежее филе лосося | 100g | fatty fishes, fish fillets, fishes, fishes and their products, salmon fillets, salmons, seafood",food
+"Майонез Слобода Провансаль | 100g | condiments, mayonnaises, sauces",food
+"Овощи для жарки Hortex с приправой по-итальянски | 100g | frozen foods, frozen plant based foods, frozen vegetables, fruits and vegetables based foods, plant based foods, plant based foods and beverag",food
+"Пирожное Kinder Delice с молочной начинкой | Kinder | 100g | candies, confectioneries, snacks, sweet snacks",food
+"Пирожное Корзиночка с грибочками | 100g | candies, confectioneries, snacks, sweet snacks",food
+"Приправа Maggi На второе для пельменей по-уральски | 100g | condiments, plant based foods, plant based foods and beverages, spices",food
+"Рис Агро-Альянс пропаренный Gold | 100g | cereal grains, cereals and potatoes, cereals and their products, plant based foods, plant based foods and beverages, rices, seeds",food
+"Рис круглозерный шлифованный | 100g | cereal grains, cereals and potatoes, cereals and their products, plant based foods, plant based foods and beverages, rices, seeds",food
+"Сыр President Мастер Бутерброда Мааздам | 100g | cheeses, dairies, fermented foods, fermented milk products",food
+"Сыр Бонгрейн Фол Эпи | 100g | cheeses, dairies, fermented foods, fermented milk products",food
+"Сыр Камамбер | 100g | cheeses, dairies, fermented foods, fermented milk products",food
+"Сыр Карат шоколадный плавленый | 100g | cheeses, dairies, fermented foods, fermented milk products, processed cheese",food
+"Сыр Кастелло Бри | 100g | cheeses, dairies, fermented foods, fermented milk products",food
+"Сыр Лимбургер | 100g | cheeses, dairies, fermented foods, fermented milk products",food
+"Сыр с белой плесенью | 100g | cheeses, dairies, fermented foods, fermented milk products",food
+"Хлеб Елизавета вафельный с витаминами и железом | 100g | breads, cereals and potatoes, cereals and their products, plant based foods, plant based foods and beverages",food
+"Хлеб Столичный | 100g | breads, cereals and potatoes, cereals and their products, plant based foods, plant based foods and beverages",food
+"Хлебцы Круазетт ржаные | 100g | breads, cereals and potatoes, plant based foods, plant based foods and beverages",food
+"Чипсы Estrella душистый укроп | 100g | appetizers, chips and fries, crisps, salty snacks, snacks",food
+"Чипсы Lays белые грибы со сметаной | 100g | appetizers, cereals and potatoes, chips and fries, crisps, plant based foods, plant based foods and beverages, potato crisps, salty snacks, snacks",food
+"Чипсы Lays сыр | 100g | appetizers, chips and fries, crisps, salty snacks, snacks",food
+"Индиски Орев (печен) | Бако | nuts, nuts and their products, plant based foods, plant based foods and beverages",food
+"сок | зелтон | 0 5 литров | beverages, beverages and beverages preparations, fruit based beverages, fruit juices, juices and nectars, plant based beverages, plant based foods and beverages",food
+"кетчуп шашлычный | Knorr | 250ml | condiments, ketchup, sauces, tomato sauces",food
+"Творог с вареньем черничным 9% | Село Устьяны | 150 г | cheeses, cream cheeses, dairies, dairy desserts, desserts, fermented foods, fermented milk products, quarks",food
+"Вода питьевая негазированная «Jeju Yongamsoo» | Orion | beverages, beverages and beverages preparations, drinking water, waters",food
+"Кекс класичний &quot;Паска&quot; | Сільпо, ТОВ &quot;Сільпо-Фуд&quot; | 300 g | biscuits and cakes, easter food, festive foods, pastries, snacks, sweet snacks",food
+"Напій безалкогольний газований ароматизований крем-сода | TM Dr Pepper | 355 ml | beverages, beverages and beverages preparations, carbonated drinks, sodas, напій безалкогольний газований ароматизован",food
+"Лохина | ORNIBERRY | 500g | berries, fruits, fruits and vegetables based foods, fruits based foods, plant based foods, plant based foods and beverages, blueberry, лохина, ягоди",food
+"Куряче філе мале «Міньйон» | Наша ряба | 600g | chicken and its products, chickens, meats, meats and their products, poultries, куряче філе",food
+"Бисквити Закуска | Победа АД | 330 g | biscuits, biscuits and cakes, dry biscuits, snacks, sweet snacks",food
+"Селско кюфте | Мусан | meat balls, meat preparations, meats, meats and their products",food
+"Консервиран зелен грах | Chef Carlo | 400 г | canned foods, canned legumes, canned peas, canned plant based foods, canned vegetables, fruits and vegetables based foods, green peas, legumes, legumes an",food
+"Кашкавал | Pilos | 400g | лашкавал, cheeses, cow cheeses, dairies, fermented foods, fermented milk products",food
+"Закуска какао бисквити | Pobeda | 290 г | biscuits, biscuits and cakes, snacks, sweet snacks",food
+"Кисело мляко Родопчанка 3.8% | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, yogurts",food
+"Печен бланширан фъстък | Бланко | 200 г | nuts, nuts and their products, plant based foods, plant based foods and beverages",food
+"Соус Терияки | Heinz | 200 | condiments, sauces, соус терияки, терияки",food
+"Молочно-шоколадний батон &quot;Milk Chocolate&quot; з начинкою крем-брюле | Roshen | 43g | chocolate filled with praline, chocolates, cocoa and its products, filled chocolates, filled milk chocolates,",food
+"сок праскова и ябълка | Queen's | 200 ml | apple juices, beverages, fruit based beverages, fruit juices, juices and nectars, non alcoholic beverages, peach juices, plant based beverages, plant based f",food
+"Jogurt Polski - Полско ягодово кисело мляко | Плодов йогурт | Mlekovita | 350g | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, yogurts",food
+"сладолед Familia Galaxy с ванилия | Galaxy | 74,5g | desserts, frozen desserts, frozen foods, ice creams, ice creams and sorbets",food
+"Макарони &quot;Spaghetti&quot; | De Luxe | 500г | dry pastas, noodles, pastas, plant based foods, plant based foods and beverages, spaghetti",food
+"Печенье диабетическое | 300 | biscuits, biscuits and cakes, biscuits and crackers, snacks, sweet snacks",food
+"Кетчуп 2 ложки шашлычный | condiments, ketchup, sauces, tomato sauces",food
+"Батон &quot;Горчичный&quot; | Орловский Хлебокомбинат | 350g | breads, cereals and potatoes, cereals and their products, plant based foods, plant based foods and beverages, white breads",food
+"Альмак литовская колбаса | Альмак | meats and their products, prepared meats, sausages",food
+"сосиски Зел.лин со сливками | meats and their products, prepared meats, sausages",food
+"Frico сыр колбасный | Cheese | Arla | 907g | cheeses, dairies, fermented foods, fermented milk products",food
+"Стейк Бавет | Мясо Есть | 290 гр | meats, meats and their products",food
+"Батон нарезной классика | 28 хлебзавод | 380 г. | breads, cereals and potatoes, plant based foods, plant based foods and beverages, sliced breads",food
+"Биойогурт активиа виноград манго папайя чиа 130г | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, yogurts",food
+"Чёрные оливки без косточек | GOODDAY | 280 г | black olives, black pitted olives, olive tree products, olives, pickles, pitted olives, plant based foods, plant based foods and beverages, plant based p",food
+"Сушени чушки | Inex Agro | 80 г | dried plant based foods, dried products, dried vegetables, fruits and vegetables based foods, plant based foods, plant based foods and beverages, red bell peppers, sw",food
+"майонез | калтве | 350 | condiments, mayonnaises, sauces, sunflower oil mayonnaises",food
+"Маршмеллоу | Guandy | 100г | candies, confectioneries, snacks, sweet snacks",food
+"Молочный шоколад смородина | Alpen Gold | chocolates, cocoa and its products, milk chocolates, snacks, sweet snacks",food
+"Саламурено сирене | няма | 0.478 | brined cheeses, cheeses, dairies, fermented foods, fermented milk products",food
+"Ръчен селски хляб | Стражица оод | 650 gr | breads, cereals and potatoes, plant based foods, plant based foods and beverages, тестени",food
+"ядра орехов миндаля | HK ENTERPRISES CC | 500 г | almonds, nuts, nuts and their products, plant based foods, plant based foods and beverages",food
+"Горошек зеленый салатный | Праздник Урожая | 425 мл, 400 г (нетто), 200 г (осн. продукт) | canned foods, canned legumes, canned peas, canned plant based foods, canned vegetables, fruits and vegetables",food
+"Горошек консервированный | Консервы натуральные. Горошек консервированный | То что надо! | Объём: 425 мл. Масса нетто: 420 г. Масса нетто основного продукта: 200 г. | canned foods, canned legumes, can",food
+"Пломбир со вкусом ванили | Натуранчо | 90 г | desserts, frozen desserts, frozen foods, ice creams, ice creams and sorbets",food
+"Халва арахисовая с ванилью | laFitole | candies, confectioneries, snacks, sweet snacks",food
+"Моцарела | cheeses, dairies, fermented foods, fermented milk products, italian cheeses, mozzarella, stretched curd cheeses",food
+"Соус Майонезный Соевый Классический | Вкусвилл ИП Нестерова Лиана Викторовна | condiments, groceries, sauces",food
+"Кашкавал от краве мляко | Мероне | cheeses, cow cheeses, dairies, fermented foods, fermented milk products",food
+"Devin Mineral&Vitamins Череша&Роза | Devin | 425 ml | beverages, flavored waters, waters",food
+"Булочки &quot;КУНЦЕВСКИЕ&quot; | ООО &quot;КОЛОС-ПРОМ&quot; | breads, cereals and potatoes, plant based foods, plant based foods and beverages, булки",food
+"Шоколадный батончик SNICKERS® КРИСПЕР | Snickers Криспер | 3x20 | bars, chocolat, chocolates, cocoa and its products, confectioneries, milk chocolates, snacks, sweet snacks, шоколадный батончик",food
+"молочный шоколад | Красный Октябрь | 90г | chocolates, cocoa and its products, milk chocolates, snacks, sweet snacks",food
+"Соус чилі солодкий | Exotic Food | 730 мл | arrabbiata sauces, condiments, groceries, pasta sauces, sauces, tomato sauces",food
+"Изюм тёмный | Красная цена | 100 г | candies, confectioneries, snacks, sweet snacks",food
+"Buckwheat baguette | Родинна Ковбаска | breads, cereals and potatoes, plant based foods, plant based foods and beverages",food
+"Хлопья овсяные 3 мелкий размер | Ясно Солнышко | breakfast cereals, breakfasts, cereal flakes, cereals and potatoes, cereals and their products, flakes, plant based foods, plant based foods and bevera",food
+"Мороженое Эскимо Светаево с арахисом и карамелью | СВЕТАЕВО | 1 шт, 80 гр | desserts, frozen desserts, frozen foods, ice creams, ice creams and sorbets",food
+"сыр творожный | Hochland | 220г | cheeses, dairies, fermented foods, fermented milk products",food
+"Сибагромолочные сосиски | meats and their products, prepared meats, sausages",food
+"Billa Микс Супер | Billa | 150 гр | nuts, nuts and their products, plant based foods, plant based foods and beverages",food
+"Пълнозърнесг хляб | Златна Добруджа | breads, cereals and potatoes, plant based foods, plant based foods and beverages",food
+"Гранатовый сок «Азербайджанский гранат» | сок гранатовый восстановленный пастеризованный с добавлением сахара | Азербайджанский гранат,ООО «Маяк»,BEL AZ AGRO | 1 l | beverages, beverages and beverages",food
+"Огурцы маринованные 6-9 см | Бояринъ | 720 ml (объём), 680 g (нетто), 360 g (основной продукт) | canned foods, canned plant based foods, canned vegetables, fruits and vegetables based foods, pickled c",food
+"Топтыжка | Сырок творожный глазированный с вареной сгущенкой | Ижмолоко | 45 g | cheeses, cream cheeses, dairies, dairy desserts, desserts, fermented foods, fermented milk products, quarks, сырки твор",food
+"Лимон Fresh маркет | Fresh маркет | citrus, fruits, fruits and vegetables based foods, fruits based foods, lemons, plant based foods, plant based foods and beverages",food
+"Лайм | Маркет fresh | citrus, fruits, fruits and vegetables based foods, fruits based foods, limes, plant based foods, plant based foods and beverages",food
+"Конфеты «Умка-Конти» с ирисом | Умка-Конти,АО «Конти-Рус» | bonbons, candies, chocolate candies, cocoa and its products, confectioneries, snacks, sweet snacks",food
+"Томатный кетчуп | Кетчуп томатный Хайнц. Первая категория. | Heinz | 25 мл | arrabbiata sauces, condiments, groceries, ketchup, pasta sauces, sauces, tomato sauces, кетчуп томатный первая категория",food
+"Хлеб Рижский подовый | Каравай-СВ | 0,7 кг | breads, cereals and potatoes, plant based foods, plant based foods and beverages, rye and wheat breads",food
+"Огурцы короткоплодные колючие | Огурцы короткоплодные колючие | 265 г | cucumbers, fresh cucumbers, fresh foods, fresh plant based foods, fresh vegetables, fruits and vegetables based foods, plant bas",food
+"Гвоздика целая | Гвоздика целая (пряность) | КОЛОСС | 20 г | condiments, groceries, plant based foods, plant based foods and beverages, spices, гвоздика целая",food
+"Какао-порошок «Золотой ярлык» | Красный Октябрь | 100 г | beverages, breakfasts, chocolates, cocoa and chocolate powders, cocoa and its products, cocoa powders, hot beverages, products sold before yea",food
+"Имбирь маринованный | Wike | 30 г | condiments, gari, ginger, groceries, pickles, plant based foods, plant based foods and beverages, plant based pickles, spices",food
+"Мороженое &quot;Соблазн&quot;. Фисташка | Соблазн | desserts, frozen desserts, frozen foods, ice creams, ice creams and sorbets",food
+"HUBA BUBA | Juyka with orange | Щедро | 350g | condiments, groceries, mayonnaises, sauces",food
+"Огурцы гладкие | 498 г, 2 шт | cucumbers, fresh cucumbers, fresh foods, fresh plant based foods, fresh vegetables, fruits and vegetables based foods, plant based foods, plant based foods and beverages",food
+"Цельный лесной орех. Шоколад темный. | Цельный лесной орех. Шоколад темный. | 90 | candies, confectioneries, snacks, sweet snacks, all",food
+"Марципан. Шоколад темный с начинкой. | Марципан. Шоколад темный с начинкой. | 90 | candies, confectioneries, snacks, sweet snacks, all",food
+"Темный шоколад 74 % какао с насыщенным вкусом из Перу | Темный шоколад 74 % какао с насыщенным вкусом из Перу | 90 | candies, confectioneries, snacks, sweet snacks, all",food
+"МОЛОЧНЫЙ ШОКОЛАД АЛЕНКА | МОЛОЧНЫЙ ШОКОЛАД АЛЕНКА | 90 | candies, confectioneries, snacks, sweet snacks, all",food
+"Какао несквик 500г | Какао несквик 500г | 75 | candies, confectioneries, snacks, sweet snacks, all",food
+"Snickers С лесным орехом | Snickers С лесным орехом | 70 | candies, confectioneries, snacks, sweet snacks, all",food
+"Синнабон | Синнабон | 50 | candies, confectioneries, snacks, sweet snacks, all, bakery",food
+"БОЛЯРСКА БАНИЦА СЪС СПАНАК | БОЛЯРСКА БАНИЦА | breads, cereals and potatoes, plant based foods, plant based foods and beverages, баница",food
+"Телешка луканка Мусанка | Мусан | 150 г | meats, meats and their products, prepared meats, sausages",food
+"Суджук телешки | Мусан | meats, meats and their products, prepared meats, sausages",food
+"Извара | Moy | 500 g | cheeses, cottage cheeses, dairies, fermented foods, fermented milk products, fresh cheeses",food
+"Плескавица с чушка, кашкавал, бекон | meals, meats, meats and their products, prepared meats",food
+"Къпини | Billa градини | 125 г | fruits, fruits and vegetables based foods, fruits based foods, plant based foods, plant based foods and beverages",food
+"пастърма Нолев | nolev | beef, beef and its products, beef preparations, meat preparations, meats, meats and their products, prepared meats, sausages",food
+"Орех | Първенец-2003 | nuts, nuts and their products, plant based foods, plant based foods and beverages",food
+"пилешко бутче | meats and their products, prepared meats, sausages",food
+"Соус чесночный | Калина малина | condiments, sauces",food
+"Каша льняная, семена льна обезжиренные | Мясновъ | breakfast cereals, breakfasts, cereals and potatoes, cereals and their products, plant based foods, plant based foods and beverages",food
+"Консервирана сладка царевица | Favorit | canned cereals, canned corn, canned foods, canned plant based foods, canned sweet corn, canned vegetables, cereal grains, cereals and potatoes, cereals and the",food
+"Багет з ковбасками та асорті | tasty time | 0,270 | breads, cereals and potatoes, plant based foods, plant based foods and beverages",food
+"Свински кюфтета | Préparation à base de viande de porc - Assaisonnée, cuite | Dulano, Saint Alby, chef select | 500g | frikandel, meat preparations, meats, meats and their products, prepared meats",food
+"Майонеза | Kania | 400 ml | condiments, mayonnaises, sauces",food
+"Моцарела XXL | Mozzarella, 45% Mat. Gr. sur matière sèche | Lovilio, Milbona, Zoma | 375 g e (250 g (2 x 125 g)) | cheeses, dairies, fermented foods, fermented milk products, italian cheeses, mozzarel",food
+"Русенско варено | PIKOK | 300g | meats, meats and their products, prepared meats",food
+"Панирани лучени кръгчета | Oignons dans une panure croustillant, pré-frits, surgelés | Culinea, McEnnedy | 450g | breaded onion rings, breaded products, combination meals, frozen foods, frozen plant b",food
+"Сметанов крем за мазане | Pilos | 200 g | cheeses, cream cheeses, dairies, fermented foods, fermented milk products",food
+"Замразени картофи | Harvest Basket | 1000 g | chips and fries, fries, frozen foods, frozen french fries to deep fry, frozen fried potatoes, frozen fries",food
+"Соев сос | Kania | 170ml | condiments, sauces, soy sauces",food
+"Пуешки хапки | chef select | 1 kg | breaded products, breaded turkey, meat preparations, meats and their products, poultry nuggets, turkey and its products, turkey nuggets, turkey preparations",food
+"Каша Овсяная со сливочным вкусом с вишней | Быстринка | breakfast cereals, breakfasts, cereals and potatoes, cereals and their products, plant based foods, plant based foods and beverages",food
+"Сельдь пряного посола | Таганская рыбоперерабатывающая компания | 1350 г (нетто), 900 г (рыба) | fatty fishes, fishes, fishes and their products, herring, seafood, сельдь пряного посола",food
+"Зелёный горошек | Консервы овощные стерилизованные «Горошек зеленый» | Зелёный горошек,Тандер,Промконсервы | Масса нетто 400 г. Масса горошка 200 г. | canned foods, canned legumes, canned peas, canned",food
+"Овсяные хлопья «экстра» | Хлопья овсяные «экстра» | Чудесный край | 400 г | breakfast cereals, breakfasts, cereal flakes, cereals and potatoes, cereals and their products, flakes, plant based foods, p",food
+"Печенье затяжное ''Сладкоежка'' | Моя цена | 500 г | biscuits, biscuits and cakes, biscuits and crackers, snacks, sweet snacks",food
+"Нектар &quot;Томат&quot; | Моя цена | 0,93 л | beverages, fruits and vegetables based foods, juices and nectars, plant based beverages, plant based foods, plant based foods and beverages, tomato juice",food
+"Хлеб белый | Хлеб белый из пшеничной муки высшего сорта в упаковке | Чудесный край | 380 г | bread white from wheat flour of the highest grade gost 26987 86, breads, cereals and potatoes, plant based ",food
+"Хлеб Крестьянский подовый в/с | 350 г | breads, cereals and potatoes, cereals and their products, plant based foods, plant based foods and beverages, хлеб пшеничный",food
+"Арахис жареный с солью | Моя цена | 80 г | legumes, legumes and their products, nuts, nuts and their products, peanuts, plant based foods, plant based foods and beverages, жареный арахис",food
+"Хлеб белый | Моя цена | 400 г | breads, cereals and potatoes, plant based foods, plant based foods and beverages, white breads",food
+"Батон пшеничный | Моя цена | 0,3 кг | breads, cereals and potatoes, plant based foods, plant based foods and beverages",food
+"Батон нарезной | Магнит | breads, cereals and potatoes, plant based foods, plant based foods and beverages, white breads, изделие булочное из муки пшеничной хлебопекарной высшего сорта",food
+"Хлеб белый новый | Моя цена | 550 г | breads, cereals and potatoes, plant based foods, plant based foods and beverages, white breads",food
+"Хлеб Домашний на молоке | Кулинария ММ (Магнит) | 250 г | breads, cereals and potatoes, plant based foods, plant based foods and beverages",food
+"Огурцы соленые | Засолыч | 1000 г | cucumbers, fruits and vegetables based foods, pickles, plant based foods, plant based foods and beverages, vegetables, vegetables based foods, солёные огурцы",food
+"Свински пастет | Belgian style specialities, Saint Alby | 170 g | liver pates, meats, meats and their products, pate, pork, pork and its products, pork liver pates, pork pates, prepared meats, charcut",food
+"Орехи макадамия | Macadamia | Alesto | 125 g | macadamia nuts, nuts, nuts and their products, plant based foods, plant based foods and beverages",food
+"Сладолед с вкус на пъпеш | Gelatelli | 1000ml | desserts, frozen desserts, frozen foods, ice creams, ice creams and sorbets",food
+"Варена шунка | Goodies Meat production | hams, meats, meats and their products, prepared meats",food
+"Филе от скумрия с кожа в рапично масло | Nautica, Nixe | 170 g | fatty fishes, fish fillets, fishes, fishes and their products, mackerel fillets, mackerels, seafood, pește",food
+"Рокфор ЗНП | Cornwall, Deluxe | 100g | blue veined cheeses, cheeses, dairies, fermented foods, fermented milk products, french blue veined cheeses, roquefort cheeses, sheep s milk cheeses",food
+"Суров бекон | Dulano | 250 g | bacon, meats, meats and their products, pork, pork and its products, unsmoked bacon",food
+"&quot;Венские вафли&quot; со взбитыми сливками | Мягкие вафли | Тандер | 140 g | biscuits and cakes, pastries, snacks, sweet snacks, waffles",food
+"Кокосови сладки | Couronnes de coco | Sondey | 300 g, 5 pièces | biscuits, biscuits and cakes, cakes, snacks, sweet snacks",food
+"Шоколад с 6% парченца малини | J.D. GROSS | 125 g | chocolates, cocoa and its products, dark chocolate bar with more than 70 cocoa, dark chocolates, dark chocolates with raspberries, snacks, sweet sna",food
+"Лайт Крем за мазане с крем сирене | Milbona | 200 g | cheese spreads, cheeses, dairies, fermented foods, fermented milk products, salted spreads, spreads",food
+"Чипс с вкус на бекон | Snack Day | 150g | appetizers, chips and fries, crisps, salty snacks, snacks",food
+"Краве масло | Саяна | animal fats, butters, dairies, dairy spreads, fats, milkfat, spreadable fats, spreads",food
+"Геркулес | Чудесный край | 500 г. | breakfast cereals, breakfasts, cereal flakes, cereals and potatoes, cereals and their products, flakes, plant based foods, plant based foods and beverages, rolled f",food
+"Извара | Pilos | 1pcs | cheeses, cottage cheeses, creamy quark, dairies, fermented foods, fermented milk products, fresh cheeses, milks, milks liquid and powder, quarks",food
+"Кренвирши варено-пушени | PIKOK | 750 | meats and their products, prepared meats, sausages",food
+"Извара 4.2% | Pilos | 275 g | cheese spreads, cheeses, cottage cheeses, dairies, fermented foods, fermented milk products, fresh cheeses, salted spreads, spreads",food
+"Spinat | Norma, Родна стряха | 500 g | fresh foods, fresh plant based foods, fresh spinachs, fresh vegetables, fruits and vegetables based foods, leaf vegetables, plant based foods, plant based foods ",food
+"Череши | Golden Breakfast, Родна стряха, Lidl, Deluxe, Lidl Deluxe | 500 g | cherries, fruits, fruits and vegetables based foods, fruits based foods, plant based foods, plant based foods and beverages",food
+"Филе от риба тон в маслиново масло Extra virgin | Deluxe | 300 g | canned fishes, canned foods, canned tunas, fatty fishes, fishes, fishes and their products, seafood, tuna in olive oil, tunas, tunas ",food
+"Млечнокисела напитка за пиене с вкус на Ягода | Йогурт за пиене | Pilos | 400g | beverages, dairies, dairy desserts, dairy drinks, desserts, drinkable yogurts, fermented dairy desserts, fermented drin",food
+"Пържени замразени картофи | Harvest basket | 3.5 kg | chips and fries, fries, frozen foods, frozen fried potatoes, frozen fries",food
+"Капелети | ITALIAMO | 250g | meals, pasta dishes, pastas, plant based foods, plant based foods and beverages, stuffed pastas",food
+"Папарделе | Chef Select | 250 g | pastas, plant based foods, plant based foods and beverages, pappardelle",food
+"Талиатели | Chef Select | 250g | cereal pastas, cereals and potatoes, cereals and their products, durum wheat pasta, durum wheat pasta with egg, egg pastas, fresh pasta, pastas, plant based foods, pla",food
+"Мюсли с лешници | Crownfield | 350 g | breakfast cereals, breakfasts, cereals and potatoes, cereals and their products, chocolate cereals, mueslis, mueslis with chocolate, plant based foods, plant bas",food
+"Салата снежанка | Chef Select | 400 g | cheeses, dairies, fermented foods, fermented milk products, meals, prepared salads",food
+"Печени и осолени бадеми | Alesto | almonds, almonds non blanched, almonds roasted, almonds shelled, legumes, legumes and their products, nuts, nuts and their products, peanuts, plant based foods, plan",food
+"Тиквено семе | Alesto | 100 г | cucurbitacea seeds, plant based foods, plant based foods and beverages, pumpkin and squash plant products, pumpkin seeds, pumpkin seeds and their products, seeds",food
+"Печени, осолени фъстъци | Alesto | 200 g | nuts, nuts and their products, peanuts, plant based foods, plant based foods and beverages",food
+"Лютеница финомляна | Freshona | 580 г | condiments, groceries, plant based foods, plant based foods and beverages, sauces",food
+"Трапезна майонеза | Kania | 200 г | condiments, mayonnaises, sauces",food
+"Пълнозърнест хляб | Lidl | 550 g | breads, cereals and potatoes, plant based foods, plant based foods and beverages, toast bread, wholemeal breads",food
+"Бял нарязан хляб | Tastino | 650 г | breads, cereals and potatoes, plant based foods, plant based foods and beverages, sliced breads, wheat breads, white breads",food
+"Типов нарязан хляб | 650 г | breads, cereals and potatoes, plant based foods, plant based foods and beverages, sliced breads, wheat breads, white breads",food
+"Бял боб | Родна стряха | 1 кг | common beans, dry haricot beans, legume seeds, legumes, legumes and their products, plant based foods, plant based foods and beverages, pulses, seeds, white beans",food
+"Кренвирши от пуешко, свинско и говеждо | Pikok | 500 г | meats, meats and their products",food
+"Йогурт с вишней | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, yogurts, c",food
+"Горчица класическа | Без | 200 г | condiments, mustards, sauces",food
+"Краве масло 82% | Родна стряха | 125 г | animal fats, butters, dairies, dairy spreads, fats, milkfat, spreadable fats, spreads",food
+"Осолен чипс | Snack Day | 150 g | appetizers, cereals and potatoes, chips and fries, crisps, plant based foods, plant based foods and beverages, potato crisps, potato crisps in sunflower oil, salty sn",food
+"Кисело мляко 3.6% внос | Родна стряха | 400g | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, yogurts",food
+"Пражка шунка | Pikok,Lidl | 500 g | cured sausages, hams, meats, meats and their products, pork, pork and its products, prepared meats, salami, sausages, produse din carne, sunca",food
+"Крема сирене със зелени подправки XXL | Goldessa, Milbona | 300 g | cheeses, cream cheeses, dairies, fermented foods, fermented milk products",food
+"Сок от моркови, ябълки и праскови | Solevita | 300 мл | beverages, beverages and beverages preparations, fruit based beverages, fruit juices, juices and nectars, plant based beverages, plant based foo",food
+"Горчица барбекю | Grill & Fun, Грил Майстор | 460 g | condiments, mustards, sauces",food
+"Кисело мляко 4.5% | Кисело мляко | Pilos | 400g | cow milk yogurts, dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, plain fermented dairy dessert",food
+"Пуешки хапки | chef select | 1500 g | breaded products, breaded turkey, meat preparations, meats and their products, poultry nuggets, turkey and its products, turkey nuggets, turkey preparations",food
+"Свински суджук | Baroni | 160 г | meats and their products, pork and its products, pork sausages, prepared meats, prepared pork meats, sausages",food
+"Пилешки черен дроб | Порция свежест | 500 г | chicken and its products, chicken liver, chickens, meats, meats and their products, poultries",food
+"Кашкавал | Milbona | 350 г | cheeses, cow cheeses, dairies, fermented foods, fermented milk products",food
+"Солени Бретцели | Snack Day - LIDL, Snack Day | 250g | appetizers, biscuits and crackers, breads, cereals and potatoes, crackers appetizers, meals, plant based foods, plant based foods and beverages, ",food
+"Бял Ориз | Бял Ориз | Родна стряха | 1кг | cereal grains, cereals and potatoes, cereals and their products, fruits and vegetables based foods, plant based foods, plant based foods and beverages, rice,",food
+"Фиде | Combino | 200g | bread coverings, cooking helpers, food decorations, pastas, pastry helpers, plant based foods, plant based foods and beverages, sprinkles",food
+"Доматен сос със сирене Рикота | Tomatensauce mit Ricotta | Italiamo, Lidl | 350 g ℮ 330 ml | condiments, groceries, sauces, tomato sauces",food
+"Доматен сос с патладжани и сирене | Lidl, Italiamo | 350 g | condiments, groceries, meal sauces, sauces, tomato sauces, tomato sauces with cheese, tomato sauces with parmesan cheese, tomato sauces wit",food
+"Доматен сос със сирене Пекорино Романо ЗНП | Combino | 350 g ℮ 330 ml | cheeses, condiments, dairies, fermented foods, fermented milk products, sauces, tomato sauces",food
+"Краве масло 80.5% | Dairy Manor, Morning Fresh | 250 g e | animal fats, butters, dairies, dairy spreads, fats, milkfat, salted butters, spreadable fats, spreads",food
+"Камамбер | Chêne d’Argent, Duc de Coeur | 250 g | camemberts, cheeses, cow cheeses, dairies, fermented foods, fermented milk products, french cheeses, pasteurised products, pasteurized cheeses, soft c",food
+"Къдрава зелена салата | Родна стряха | 1 бр. | fruits and vegetables based foods, leaf vegetables, lettuces, plant based foods, plant based foods and beverages, vegetable based foods and beverages, ve",food
+"Бисквити от ронливо тесто с лимонов мус | Biscuits sablés pur beurre nappés d'une couche au citron | Duc de Coeur, Sondey | 125g | biscuits, biscuits and cakes, biscuits and crackers, snacks, sweet sn",food
+"cașcaval | Pilos,Polonia,Окрегова Сполдзелня Млецарска | 300 g | cheeses, cow cheeses, dairies, fermented foods, fermented milk products",food
+"Доматен сос с рукола и пармезан | Sauce tomate avec de la roquette et du Parmigiano Reggiano, pasteurisée | Deluxe | 350g | condiments, groceries, pasta sauces, sauces, tomato sauces",food
+"Доматен сос с чери домати и сирене | Deluxe | 350g | condiments, groceries, pasta sauces, sauces, tomato sauces",food
+"Свински кебапчета &quot;Стара планина&quot; | Порция свежест | 480 г | meat balls, meat preparations, meats and their products, pork and its products, pork meat balls, pork preparations",food
+"Кюфте &quot;Стара Планина&quot; от свинско месо | Lidl | meat balls, meat preparations, meats, meats and their products, pork, pork and its products, pork meat balls, pork preparations",food
+"Филе от херинга с кожа | Nixe | 170 g | canned fishes, canned foods, canned herrings, fatty fishes, fish fillets, fishes, fishes and their products, herring, seafood",food
+"Херинга в доматен сос | Nixe,Nautica | 170 g | fatty fishes, fish fillets, fishes, fishes and their products, herring, seafood",food
+"Топено сирене със сирене Тилзит | Pilos, Sertop | 100 g | cheeses, dairies, fermented foods, fermented milk products, melted cheese",food
+"Доматен сос с манатарки | Italiamo | 350 g | condiments, meal sauces, sauces, tomato sauces, tomato sauces with mushrooms",food
+"Шпек Бургас | Родна стряха | 250 г | meats and their products, pork sausages, prepared meats, sausages",food
+"Прясно Пилешко Филе С Билкова Марина | Грил Майстор | meat preparations, meats and their products",food
+"Мини наденички по виенски от свинско месо | Dulano | 320 g | наденица, cured sausages, meats, meats and their products, prepared meats, sausages",food
+"Jeunes pousses d'épinards | Родна стряха | 125 г | fresh foods, fresh plant based foods, fresh spinachs, fresh vegetables, fruits and vegetables based foods, leaf vegetables, plant based foods, plant ",food
+"Пица с 4 вида сирена | Italiamo | 350 g | cheese pizzas, four cheese pizza, frozen foods, frozen pizzas, frozen pizzas and pies, meals, pizzas, pizzas pies and quiches, vegetarian pizzas",food
+"Свинска пикантна наденица | Italiamo | 250g | meats and their products, pork sausages, prepared meats, sausages",food
+"Саламурено сирене от краве мляко | Pilos | 400 г | cheeses, cow cheeses, dairies, fermented foods, fermented milk products",food
+"Саламуррено сирене от краве мляко | Pilos | 800 г | brined cheeses, cheeses, dairies, fermented foods, fermented milk products",food
+"Бял ориз среднозърнест | Golden sun | 1 кг | cereal grains, cereals and potatoes, cereals and their products, plant based foods, plant based foods and beverages, rices, seeds, white rices",food
+"Стек аламинут от младо телешко | Порция свежест | 300 г | meats, meats and their products, veal meat",food
+"Кюфтета &quot;Стара планина&quot; от свинско и говеждо месо | Порция свежест | 480 г | meat balls, meat preparations, meats and their products",food
+"Бирени пръчици | Pikok | 280 g | meats, meats and their products, pork, pork and its products, pork sausages, prepared meats, sausages",food
+"Леща | Campo Largo | 500 г | legume seeds, legumes, legumes and their products, lentils, plant based foods, plant based foods and beverages, pulses, seeds",food
+"Наденица от младо телешко | Lidl | 450 г | meats, meats and their products",food
+"Рибни пръчици от филе от минтай | Ocean Sea | 900g | breaded fish, breaded hake fish, breaded products, fish fingers, fish preparations, fishes, fishes and their products, frozen foods, meals, seafood",food
+"Салам от свинско и дивеч | Lidl | 400 г | meats and their products, pork sausages, prepared meats, sausages",food
+"Млечен шоколад с парченца лешници | Fin Carré | 40 g | chocolates, chocolates with hazelnuts, cocoa and its products, milk chocolates, milk chocolates with hazelnuts, snacks, sweet snacks",food
+"Кисело мляко с праскови и маракуя | Pilos | 400 g | dairies, dairy desserts, desserts, fermented dairy desserts, fermented dairy desserts with fruits, fermented foods, fermented milk products, fruit y",food
+"Кисело мляко с вишни | Pilos | 400 g | cherry yogurts, dairies, dairy desserts, desserts, fermented dairy desserts, fermented dairy desserts with fruits, fermented foods, fermented milk products, frui",food
+"Франкфуртери от свински бут | Pikok | 350 g | ham sausages, meats, meats and their products, pork sausages, prepared meats, sausages",food
+"Семки | Alesto | plant based foods, plant based foods and beverages, seeds, sunflower seeds, sunflower seeds and their products",food
+"Кекс с парченца шоколад | Confiserie Firenze, Kuchenzauber | 300 g | biscuits, biscuits and cakes, biscuits and crackers, cakes, snacks, sweet snacks",food
+"Хлеб | Яблоко | 400г | breads, cereals and potatoes, plant based foods, plant based foods and beverages, rye breads",food
+"Пасирани домати | Baresa | 700g | condiments, fruits and vegetables based foods, groceries, plant based foods, plant based foods and beverages, sauces, strained tomatoes, tomato sauces, tomatoes and t",food
+"Нарязани кисели краставички | Freshona, McEnnedy, McKennedy | 670g | canned foods, canned plant based foods, canned vegetables, cucumbers, fruits and vegetables based foods, gherkins, pickled cucumber",food
+"Печено свинско филе | Dulano, Sutter GmbH | 150 g | cut, meats, meats and their products, prepared meats",food
+"Пилешки гърди с червени чушки | Pikok | 75g | chicken and its products, chicken breasts, chickens, meats, meats and their products, poultries",food
+"Пилешки гърди | Pikok | 75 г | chicken and its products, chicken breasts, chickens, meats, meats and their products, poultries",food
+"Пилешки гърди | Pikok | 75 g | meats, meats and their products, poultries",food
+"Фъстъци, печени, солени | Alesto | 100 г | nuts, nuts and their products, peanuts, plant based foods, plant based foods and beverages",food
+"Бял ориз | Родна стряха | 2 кг | cereal grains, cereals and potatoes, cereals and their products, plant based foods, plant based foods and beverages, rices, seeds, white rices",food
+"Трапезна майонеза | Kania | 200 г | condiments, mayonnaises, sauces, sunflower oil mayonnaises",food
+"Кисело краве млѣко 2% | Родна стряха | 500 g | cow milk yogurts, dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, yogurts",food
+"Кисело мляко 3.6% | Родна стряха | 500 г | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, plain fermented dairy desserts, plain yogurts, yogurts",food
+"Ловджийски наденички | Порция свежест | 400 г | meats, meats and their products, pork, pork and its products",food
+"Българско кисело мляко 3.6% БДС | Родна стряха | 400 г | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, yogurts",food
+"Българско бяло саламурено сирене | Родна страха | 400 g | bulgarian cheeses, bulgarian white brine cheese, cheeses, dairies, fermented foods, fermented milk products",food
+"Цариградски кюфтета от свинско и говеждо | Порция свежест | 600 г | meat balls, meat preparations, meats, meats and their products",food
+"Локумена вафла с вкус на роза | Родна стряха | biscuits, biscuits and cakes, snacks, sweet snacks, wafers",food
+"Цедено кисело мляко 10% | Родна Стряхa | 500 г | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, yogurts",food
+"Свинска саздърма | Родна стряха | 200 г | meats, meats and their products, pork, pork and its products",food
+"Кисело мляко с горски плодове | Pilos | 400 g | dairies, dairy desserts, desserts, fermented dairy desserts, fermented dairy desserts with fruits, fermented foods, fermented milk products, fruit yogur",food
+"Пуешко месо от бутче | Pikok | 280 г | meats, meats and their products, poultries, turkey and its products, turkeys",food
+"Пилешко месо от бутче | Pikok | 280 г | meats, meats and their products, poultries",food
+"Розови домати | Родна стряха | 750 г | fruits and vegetables based foods, plant based foods, plant based foods and beverages, tomatoes, tomatoes and their products, vegetable based foods and beverages",food
+"Млечен шоколад | 100 г | chocolates, cocoa and its products, milk chocolates, snacks, sweet snacks",food
+"Сьомга със сусам, студено-пушена | Deluxe | 100 g | fatty fishes, fishes, fishes and their products, salmons, seafood, smoked fishes, smoked salmons, smoked salmons from farming",food
+"Хлеб | Maxima | breads, cereals and potatoes, plant based foods, plant based foods and beverages",food
+"Гречневая лапша с курицей | Лавка | 255 | noodles, pastas, plant based foods, plant based foods and beverages",food
+"Сок от ябълка | Solevita | 3 l | apple juices, beverages, fruit based beverages, fruit juices, juices and nectars, plant based beverages, plant based foods and beverages, unsweetened beverages",food
+"Синьо сирене | Pilos | 120 g | blue veined cheeses, cheeses, dairies, fermented foods, fermented milk products",food
+"Yogurt natural | Деъри Дей ЕООД, Лидл | 400g | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, yogurts",food
+"Кисело краве мляко 3.6% | Pilos | 400 г | cow milk yogurts, dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, yogurts",food
+"Бял хляб тип ръчен | Родна стряха | 600 г | breads, cereals and potatoes, flours, plant based foods, plant based foods and beverages, sliced breads, white breads",food
+"Наденички &quot;Bangers&quot; по английски | Hatherwood | 500 g | meats, meats and their products",food
+"Луканка clean label | Pikok | 170 g | cured sausages, meats, meats and their products, pork sausages, prepared meats, sausages",food
+"Чипс от кафяв пълнозърнест ориз | Snack Day | 60 g | appetizers, chips and fries, crisps, salty snacks, snacks",food
+"Бяло саламурено сирене от краве и биволско мляко | Родна стряха | 400 г | brined cheeses, cheeses, cow cheeses, dairies, fermented foods, fermented milk products",food
+"Червена леща | Campo Largo | 500 г | legume seeds, legumes, legumes and their products, lentils, plant based foods, plant based foods and beverages, pulses, red lentils, seeds",food
+"Червен боб Кидни | Campo Largo | 500 г | common beans, legume seeds, legumes, legumes and their products, plant based foods, plant based foods and beverages, pulses, red beans, seeds",food
+"Натурална минерална вода | Saguaro | 1.5 л | beverages, mineral waters, natural mineral waters, spring waters, waters",food
+"Бяло саламурено сирене от краве мляко | Pilos | 600 g | brined cheeses, cheeses, cow cheeses, dairies, fermented foods, fermented milk products",food
+"Ущипци от свинско и говеждо месо с кашкавал | 600 g | meat balls, meat preparations, meats, meats and their products",food
+"Тиквено семе | Alesto | 100 g | cucurbitacea seeds, plant based foods, plant based foods and beverages, pumpkin and squash plant products, pumpkin seeds, pumpkin seeds and their products, seeds",food
+"Печени слънчогледови семки | Alesto | 200 g | plant based foods, plant based foods and beverages, roasted sunflower seeds, seeds, sunflower seeds, sunflower seeds and their products",food
+"Слънчогледово семе | Alesto | 200g | plant based foods, plant based foods and beverages, seeds, sunflower seeds, sunflower seeds and their products",food
+"Микс от сурови ядки и сушени плодове | Lidl | nuts, nuts and their products, plant based foods, plant based foods and beverages",food
+"Български кашкавал от краве мляко БДС | Родна стряха | 430 г | cheeses, cow cheeses, dairies, fermented foods, fermented milk products",food
+"Кренвирши от свинско месо | Baroni | 500 g | meats, meats and their products, pork, pork and its products",food
+"Типов хляб | Няма | 650 г | breads, cereals and potatoes, plant based foods, plant based foods and beverages, sliced breads",food
+"Пастет апетит | Baroni | meats, meats and their products, pate, pork, pork and its products, pork pates, prepared meats, charcuteries diverses",food
+"Кисело мляко 3.6% | Без | 400 г | dairies, dairy desserts, desserts, fermented dairy desserts, fermented foods, fermented milk products, plain fermented dairy desserts, plain yogurts, yogurts",food
+"Луканков салам | Baroni | 300 g | cured sausages, meats, meats and their products, prepared meats, salami",food
+"Хумус традиционен | chef select | 250 g | condiments, dips, hummus, plant based foods, plant based foods and beverages, plant based spreads, salted spreads, sauces, spreads",food

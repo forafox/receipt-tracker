@@ -1,0 +1,10 @@
+{
+  "id_to_label": {
+    "0": "cafe",
+    "1": "food",
+    "2": "household",
+    "3": "medicine",
+    "4": "personal_care"
+  },
+  "max_length": 64
+}
