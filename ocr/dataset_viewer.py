@@ -14,6 +14,11 @@ HEADER = 40
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options for the dataset previewer.
+
+    Returns:
+        Parsed preview configuration.
+    """
     parser = argparse.ArgumentParser(description="Preview receipt dataset items with OpenCV.")
     parser.add_argument("--task", choices=("det", "rec"), default="det")
     parser.add_argument("--source", choices=("eng", "ru"), default="eng")
@@ -34,6 +39,15 @@ def parse_args() -> argparse.Namespace:
 
 
 def render_detection(image: np.ndarray, boxes: list[tuple[int, int, int, int]]) -> np.ndarray:
+    """Draw text-detection boxes on an image copy.
+
+    Args:
+        image: Source receipt image.
+        boxes: Absolute pixel boxes in ``(x1, y1, x2, y2)`` form.
+
+    Returns:
+        Image copy with detection boxes drawn on it.
+    """
     canvas = image.copy()
     for x1, y1, x2, y2 in boxes:
         cv2.rectangle(canvas, (x1, y1), (x2, y2), (0, 200, 0), 2)
@@ -41,6 +55,15 @@ def render_detection(image: np.ndarray, boxes: list[tuple[int, int, int, int]]) 
 
 
 def render_recognition(image: np.ndarray, text: str) -> np.ndarray:
+    """Render a recognition crop with its text label.
+
+    Args:
+        image: Source recognition crop.
+        text: Expected OCR text for the crop.
+
+    Returns:
+        Image with a header containing the text label.
+    """
     height, width = image.shape[:2]
     canvas = np.full((height + HEADER, width, 3), 255, dtype=np.uint8)
     canvas[HEADER:, :] = image
@@ -62,12 +85,23 @@ def render_recognition(image: np.ndarray, text: str) -> np.ndarray:
 def clamp_window(
     canvas: np.ndarray, max_width: int = 1200, max_height: int = 900
 ) -> tuple[int, int]:
+    """Calculate window dimensions that fit within configured bounds.
+
+    Args:
+        canvas: Image whose dimensions determine the window aspect ratio.
+        max_width: Maximum window width.
+        max_height: Maximum window height.
+
+    Returns:
+        Scaled window width and height.
+    """
     height, width = canvas.shape[:2]
     scale = min(1.0, max_width / width, max_height / height)
     return int(width * scale), int(height * scale)
 
 
 def main() -> None:
+    """Run the interactive receipt dataset previewer."""
     args = parse_args()
     rng = random.Random(args.seed)
 

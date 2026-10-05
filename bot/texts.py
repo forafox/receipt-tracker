@@ -3,6 +3,17 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Texts:
+    """Localized user-facing bot messages and command descriptions.
+
+    Attributes:
+        start: Greeting sent for the start command.
+        help: Usage guidance sent for the help command.
+        unknown: Reply sent for unsupported messages.
+        error: Reply sent when receipt processing fails.
+        help_command: Localized help command description.
+        month_command: Localized monthly report command description.
+    """
+
     start: str
     help: str
     unknown: str
@@ -43,6 +54,14 @@ DEFAULT_TEXTS = EN
 
 
 def texts_for(language_code: str | None) -> Texts:
+    """Select localized texts for a Telegram language code.
+
+    Args:
+        language_code: Telegram language code, optionally including a region.
+
+    Returns:
+        Matching localized texts, or the default English texts.
+    """
     if not language_code:
         return DEFAULT_TEXTS
     language = language_code.split("-")[0].lower()
