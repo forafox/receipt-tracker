@@ -32,16 +32,3 @@ class ClassifiedReceipt(BaseModel):
     receipt_id: str = Field(min_length=1)
     purchased_at: datetime
     items: list[ClassifiedItem] = Field(min_length=1)
-
-
-class ReceiptCategorySummary(BaseModel):
-    category: str
-    total: Decimal
-    items_count: int = Field(ge=0)
-
-
-class MonthlyReport(BaseModel):
-    year: int
-    month: int = Field(ge=1, le=12)
-    total: Decimal
-    categories: list[ReceiptCategorySummary]

@@ -1,68 +1,51 @@
 # receipt-tracker
 
-`receipt-tracker` — учебный сервис для учета расходов по фотографиям чеков.
-Пользователь фотографирует чек, отправляет его Telegram-боту, а система
-распознает текст, извлекает структуру чека, классифицирует товары по категориям
-и собирает месячные отчеты.
-
-Главная идея проекта: убрать ручной ввод расходов. Пользователь работает только
-с фото чека и командами бота, а пайплайн сам превращает изображение в понятные
-категории трат.
+`receipt-tracker` — учебный проект для обработки чеков. Пользователь отправляет
+фото чека в Telegram-бота, система распознает текст, извлекает структурированный
+чек и классифицирует товарные позиции по категориям.
 
 ## Возможности
 
-- прием фотографии чека через Telegram-бота;
-- OCR-распознавание текста с изображения;
-- извлечение структуры чека: дата, сумма, позиции;
-- классификация товарных позиций по категориям;
-- confidence для каждой предсказанной категории;
-- месячная агрегация расходов по категориям;
-- HTTP API для модуля классификации;
+- прием фото чека через Telegram-бота;
+- OCR-распознавание текста;
+- извлечение структурированного чека отдельным модулем M2;
+- категоризация позиций чека модулем M3;
+- confidence для каждой категории;
+- FastAPI-интерфейс M3 для взаимодействия с остальными модулями;
 - CLI для сборки датасета, обучения и оценки модели;
 - обученная transformer-модель в репозитории;
-- тесты, типизация, линтинг и Dockerfile.
+- тесты, линтер, типизация и Dockerfile.
 
 ## Архитектура
 
-Проект разделен на четыре модуля:
-
 | Модуль | Пакеты | Ответственность |
 |---|---|---|
-| M1 OCR | `ocr/` | Принимает фото чека и возвращает распознанный текст с координатами. |
-| M2 Extract | `extract/` | Превращает OCR-текст в JSON-чек: дата, сумма, товары. |
-| M3 Categorize | `categorize/`, `reports/` | Классифицирует товары по категориям и строит месячные отчеты. |
-| M4 Bot/Pipeline/Storage | `bot/`, `pipeline/`, `storage/` | Общается с пользователем, вызывает M1-M3 и сохраняет данные. |
+| M1 OCR | `ocr/` | Распознает текст на фото чека и возвращает OCR-результат. |
+| M2 Extract | `extract/` | Превращает OCR-результат в структурированный `Receipt`. |
+| M3 Categorize | `categorize/` | Принимает `Receipt` через FastAPI и возвращает `ClassifiedReceipt`. |
+| M4 Bot/Pipeline/Storage | `bot/`, `pipeline/`, `storage/` | Оркестрирует M1-M3, общается с пользователем и хранит данные. |
 
-Общие модели данных лежат в `common/`. Модули должны общаться через эти
-контракты, а не импортировать внутренние реализации друг друга.
+M3 не принимает фото и не общается с OCR напрямую. Между OCR и M3 должен быть
+M2 Extract. Внешний протокол M3 — HTTP JSON через FastAPI.
 
-Важная граница: M3 не принимает фото и не работает напрямую с OCR. Между OCR и
-классификатором стоит M2 Extract. OCR возвращает распознанный текст и
-координаты, M2 превращает этот результат в структурированный `Receipt`, и
-только после этого M3 классифицирует позиции.
-
-## Структура ветки
-
-Ветка `uvusibuneka` содержит реализованный модуль M3 и общие контракты,
-необходимые для его работы:
+## Структура
 
 ```text
-categorize/                  # классификатор категорий, API, обучение, eval
-common/                      # Pydantic-контракты Receipt, Item, MonthlyReport
-dataset/category/            # seed-набор и собранный training.csv
-models/category_transformer/ # обученная transformer-модель
-reports/                     # месячная агрегация расходов
-tests/                       # unit/API tests для M3
-Dockerfile                   # запуск M3 API в контейнере
-pyproject.toml               # зависимости и настройки инструментов
-uv.lock                      # lock-файл uv
+categorize/
+common/
+dataset/category/
+models/category_transformer/
+tests/
+Dockerfile
+pyproject.toml
+uv.lock
 ```
 
-## Контракты данных
+## Контракты
 
-Основные модели находятся в `common/models.py`.
+Контракты лежат в `common/models.py`.
 
-`Item` — позиция чека:
+`Item`:
 
 ```json
 {
@@ -72,7 +55,7 @@ uv.lock                      # lock-файл uv
 }
 ```
 
-`Receipt` — чек:
+`Receipt`, который M2 передает в M3:
 
 ```json
 {
@@ -88,21 +71,7 @@ uv.lock                      # lock-файл uv
 }
 ```
 
-`ClassifiedItem` — позиция после классификации:
-
-```json
-{
-  "name": "молоко цельное",
-  "quantity": "1",
-  "total": "89.90",
-  "category": "food",
-  "confidence": 0.93
-}
-```
-
-Деньги хранятся через `Decimal`, даты — timezone-aware `datetime`.
-
-`ClassifiedReceipt` — публичный результат M3 для M4:
+`ClassifiedReceipt`, который M3 возвращает M2/M4:
 
 ```json
 {
@@ -120,96 +89,57 @@ uv.lock                      # lock-файл uv
 }
 ```
 
-## M3: классификатор категорий
-
-M3 реализован в пакете `categorize/`.
+## M3 Categorize
 
 Компоненты:
 
-- `classifier.py` — протокол `CategoryClassifier`;
-- `interfaces.py` — публичный протокол `ReceiptCategorizer` для связи M2/M4 с M3;
-- `transformer.py` — inference обученной transformer-модели;
-- `training.py` — fine-tuning transformer-модели;
-- `external_dataset.py` — загрузка внешнего датасета с Hugging Face;
-- `dataset.py` — чтение CSV-датасета;
-- `service.py` — сервис классификации позиций;
-- `api.py` — FastAPI-приложение;
-- `eval.py` — расчет accuracy;
-- `__main__.py` — CLI.
+- `categorize/api.py` — FastAPI-приложение;
+- `categorize/service.py` — сервис категоризации;
+- `categorize/transformer.py` — загрузка модели и inference;
+- `categorize/training.py` — обучение transformer-модели;
+- `categorize/external_dataset.py` — сборка обучающего CSV из Hugging Face;
+- `categorize/dataset.py` — чтение CSV;
+- `categorize/eval.py` — расчет accuracy;
+- `categorize/__main__.py` — CLI.
 
-Используемая базовая модель: `cointegrated/rubert-tiny`.
+Базовая модель: `cointegrated/rubert-tiny`.
 
-Обученная модель сохранена в:
+Обученная модель:
 
 ```text
 models/category_transformer/
 ```
 
-В каталоге модели лежат:
-
-- `model.safetensors` — веса fine-tuned transformer;
-- `config.json` — конфигурация модели;
-- `tokenizer.json` и `tokenizer_config.json` — tokenizer;
-- `category_metadata.json` — соответствие id категории и имени категории;
-- `training_args.bin` — параметры обучения.
-
-## Категории
-
-Текущие категории M3:
+Категории:
 
 | Категория | Значение |
 |---|---|
-| `food` | продукты, напитки, бакалея, мясо, молочные товары |
+| `food` | продукты и напитки |
 | `household` | бытовая химия и товары для дома |
 | `personal_care` | гигиена и уход |
 | `medicine` | аптека и медицинские товары |
 | `cafe` | кафе, рестораны, готовая еда |
 
-Категории можно расширять через датасет и повторное обучение.
-
 ## Датасет
 
-Для обучения используется CSV:
+Основной CSV:
 
 ```text
 dataset/category/training.csv
 ```
 
-Он собирается из двух источников:
+Источники:
 
-1. Локальный seed-набор чековых позиций:
+- локальный seed-набор `dataset/category/items.csv`;
+- Hugging Face датасет `IvanTatarkin/ru-product-taxonomy`.
 
-   ```text
-   dataset/category/items.csv
-   ```
-
-2. Открытый русский датасет Hugging Face:
-
-   ```text
-   IvanTatarkin/ru-product-taxonomy
-   ```
-
-Внешний датасет содержит русскоязычную taxonomy товаров. В M3 он используется
-как источник реальных товарных названий для усиления категории `food`, а
-локальный seed-набор добавляет категории, которых нет в продуктовой taxonomy:
-`household`, `personal_care`, `medicine`, `cafe`.
-
-Собрать датасет заново:
+Собрать CSV заново:
 
 ```bash
 uv run python -m categorize build-dataset --limit 300
 ```
 
-Параметры:
-
-- `--output` — путь для итогового CSV, по умолчанию
-  `dataset/category/training.csv`;
-- `--seed` — локальный seed CSV, по умолчанию `dataset/category/items.csv`;
-- `--limit` — сколько строк взять из внешнего датасета.
-
 ## Обучение
-
-Переобучить transformer:
 
 ```bash
 uv run python -m categorize train \
@@ -217,22 +147,14 @@ uv run python -m categorize train \
   --model models/category_transformer
 ```
 
-По умолчанию обучение использует:
-
-- базовую модель `cointegrated/rubert-tiny`;
-- `6` эпох;
-- `max_length=64`;
-- train/test split `80/20`;
-- метрику `accuracy`.
-
-Последний прогон обучения дал:
+Последний training run:
 
 ```text
 eval_accuracy=0.9385
 train_loss=0.2914
 ```
 
-Проверка сохраненной модели на собранном CSV:
+Проверить сохраненную модель:
 
 ```bash
 uv run python -m categorize eval \
@@ -240,17 +162,15 @@ uv run python -m categorize eval \
   --model models/category_transformer
 ```
 
-Результат последней проверки:
+Последний eval:
 
 ```text
 accuracy=0.960 examples=322
 ```
 
-## API
+## FastAPI
 
-M3 поднимается как FastAPI-сервис.
-
-Локальный запуск:
+Запуск:
 
 ```bash
 uv run fastapi dev categorize/api.py
@@ -262,9 +182,15 @@ Production-like запуск:
 uv run fastapi run categorize/api.py --host 0.0.0.0 --port 8000
 ```
 
+Swagger UI:
+
+```text
+http://localhost:8000/docs
+```
+
 ### `POST /classify`
 
-Классифицирует одну позицию.
+Категоризирует одну позицию.
 
 Запрос:
 
@@ -290,7 +216,7 @@ uv run fastapi run categorize/api.py --host 0.0.0.0 --port 8000
 
 ### `POST /classify/items`
 
-Классифицирует список позиций.
+Категоризирует список позиций.
 
 Запрос:
 
@@ -336,9 +262,8 @@ uv run fastapi run categorize/api.py --host 0.0.0.0 --port 8000
 
 ### `POST /classify/receipt`
 
-Основной интеграционный endpoint для пайплайна M2 → M3. Принимает
-структурированный чек, который должен вернуть M2 Extract, и возвращает тот же
-чек с категориями и confidence на каждой позиции.
+Основной endpoint для M2/M4. Принимает структурированный `Receipt`, возвращает
+`ClassifiedReceipt`.
 
 Запрос:
 
@@ -374,58 +299,9 @@ uv run fastapi run categorize/api.py --host 0.0.0.0 --port 8000
 }
 ```
 
-### `POST /reports/monthly`
-
-Классифицирует позиции чеков и собирает месячный отчет.
-
-Запрос:
-
-```json
-[
-  {
-    "receipt_id": "r-1",
-    "purchased_at": "2026-10-03T10:00:00+03:00",
-    "items": [
-      {
-        "name": "шампунь",
-        "quantity": "1",
-        "total": "210"
-      },
-      {
-        "name": "хлеб",
-        "quantity": "1",
-        "total": "55"
-      }
-    ]
-  }
-]
-```
-
-Ответ:
-
-```json
-{
-  "year": 2026,
-  "month": 10,
-  "total": "265",
-  "categories": [
-    {
-      "category": "personal_care",
-      "total": "210",
-      "items_count": 1
-    },
-    {
-      "category": "food",
-      "total": "55",
-      "items_count": 1
-    }
-  ]
-}
-```
-
 ### `POST /train`
 
-Переобучает модель на указанном датасете и перезагружает сервис.
+Переобучает модель и перезагружает сервис.
 
 Запрос:
 
@@ -438,124 +314,21 @@ uv run fastapi run categorize/api.py --host 0.0.0.0 --port 8000
 
 Успешный ответ: `204 No Content`.
 
-## Отчеты
-
-Месячные отчеты реализованы в `reports/monthly.py`.
-
-`build_monthly_report()` принимает список чеков с уже классифицированными
-позициями, проверяет, что все чеки относятся к одному месяцу, и возвращает:
-
-- год;
-- месяц;
-- общую сумму;
-- суммы по категориям;
-- количество позиций в каждой категории.
-
-Если передать неклассифицированные позиции, функция выбросит `TypeError`.
-
 ## Docker
-
-Сборка образа:
 
 ```bash
 docker build -t receipt-tracker-m3 .
-```
-
-Запуск:
-
-```bash
 docker run --rm -p 8000:8000 receipt-tracker-m3
 ```
 
-После запуска API будет доступно на:
-
-```text
-http://localhost:8000
-```
-
-Swagger UI:
-
-```text
-http://localhost:8000/docs
-```
-
-Примечание: `torch` может подтянуть крупные platform-specific wheels. На
-машинах с ограниченным свободным местом Docker build может потребовать очистки
-Docker cache или отдельной настройки CPU-only PyTorch index.
-
-## Установка и запуск
-
-Требования:
-
-- Python 3.12+;
-- `uv`;
-- доступ к интернету для повторной сборки датасета или скачивания базовой
-  transformer-модели;
-- Docker, если нужен контейнерный запуск.
-
-Установка зависимостей:
-
-```bash
-uv sync
-```
-
-Запуск API:
-
-```bash
-uv run fastapi dev categorize/api.py
-```
-
-Проверка модели:
-
-```bash
-uv run python -m categorize eval
-```
-
-## Тесты и качество
-
-Форматирование:
+## Проверки
 
 ```bash
 uv run ruff format
-```
-
-Линтер:
-
-```bash
 uv run ruff check
-```
-
-Типизация:
-
-```bash
-uv run mypy common categorize reports tests
-```
-
-Тесты:
-
-```bash
+uv run mypy common categorize tests
 uv run pytest
 ```
-
-Последний полный прогон:
-
-```text
-ruff check: passed
-mypy: Success, no issues found in 18 source files
-pytest: 6 passed, 1 warning
-```
-
-## Git workflow
-
-Правила разработки описаны в [CONTRIBUTING.md](CONTRIBUTING.md).
-
-Коротко:
-
-- одна задача — одна ветка;
-- коммиты на английском в формате Conventional Commits;
-- перед PR должны проходить `ruff format`, `ruff check`, `mypy`, `pytest`;
-- изменения контрактов в `common/` должны быть согласованы с владельцами
-  затронутых модулей.
 
 ## Команда
 
@@ -563,15 +336,3 @@ pytest: 6 passed, 1 warning
 - Даниил Качанов
 - Артем Зайцев
 - Даниил Горляков
-
-## Статус
-
-В ветке `uvusibuneka` полностью реализован M3:
-
-- есть обученный transformer-классификатор;
-- есть рабочее API;
-- есть CLI для датасета, обучения и eval;
-- есть месячные отчеты;
-- есть тесты;
-- есть Dockerfile;
-- модель и датасет добавлены в репозиторий.

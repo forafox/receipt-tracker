@@ -9,8 +9,7 @@ from pydantic import BaseModel, Field
 from categorize.service import CategoryService
 from categorize.training import train_transformer
 from categorize.transformer import TransformerCategoryClassifier
-from common import ClassifiedItem, ClassifiedReceipt, Item, MonthlyReport, Receipt
-from reports.monthly import build_monthly_report
+from common import ClassifiedItem, ClassifiedReceipt, Item, Receipt
 
 DEFAULT_DATASET_PATH = Path("dataset/category/training.csv")
 DEFAULT_MODEL_PATH = Path("models/category_transformer")
@@ -85,15 +84,6 @@ def classify_receipt(
     service: CategoryServiceDependency,
 ) -> ClassifiedReceipt:
     return service.classify_receipt(receipt)
-
-
-@app.post("/reports/monthly", response_model=MonthlyReport)
-def monthly_report(
-    receipts: list[Receipt],
-    service: CategoryServiceDependency,
-) -> MonthlyReport:
-    classified_receipts = [service.classify_receipt(receipt) for receipt in receipts]
-    return build_monthly_report(classified_receipts)
 
 
 @app.post("/train", status_code=204)
