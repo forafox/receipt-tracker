@@ -1,0 +1,111 @@
+text,category
+кофе американо,cafe
+капучино,cafe
+латте,cafe
+эспрессо,cafe
+сэндвич с курицей,cafe
+бизнес ланч,cafe
+салат цезарь,cafe
+бургер,cafe
+картофель фри,cafe
+пицца кусок,cafe
+ролл с лососем,cafe
+шаурма,cafe
+суп дня,cafe
+комбо обед,cafe
+чай в кафе,cafe
+лимонад,cafe
+десерт чизкейк,cafe
+круассан,cafe
+пирожное,cafe
+готовый обед,cafe
+молоко 3.2%,food
+молоко цельное,food
+хлеб бородинский,food
+батон нарезной,food
+сыр гауда,food
+творог,food
+йогурт натуральный,food
+яблоки сезонные,food
+бананы,food
+картофель молодой,food
+морковь,food
+куриная грудка,food
+фарш говяжий,food
+колбаса докторская,food
+макароны,food
+рис круглозерный,food
+гречка,food
+масло сливочное,food
+яйца куриные,food
+сахар песок,food
+чай черный,food
+кофе молотый,food
+сок яблочный,food
+вода минеральная,food
+"Cappy Портокал | Cappy | 250 ml | beverages, fruit based beverages, fruit juices, fruit juices from concentrate, juices and nectars, orange juices, orange juices from concentrate, plant based beverage",food
+"Арахис в скорлупе | nuts, nuts and their products, peanuts, plant based foods, plant based foods and beverages",food
+"ПИДЕ с квас | Kaufland | 500 г | breads, cereals and potatoes, plant based foods, plant based foods and beverages, sourdough pita bread, special breads, пита с квас",food
+"Кешью сырой сушеный | Ozon fresh | 1000 g | cashew nuts, nuts, nuts and their products, plant based foods, plant based foods and beverages",food
+"Арахис жареный соленый | Ozon fresh | 1000 g | legumes, legumes and their products, nuts, nuts and their products, peanuts, plant based foods, plant based foods and beverages",food
+"Сормовское сливочное печенье | 50грамм | biscuits, biscuits and cakes, biscuits and crackers, snacks, sweet snacks",food
+стиральный порошок,household
+порошок для стирки,household
+гель для стирки,household
+капсулы для стирки,household
+кондиционер для белья,household
+средство для посуды,household
+средство для мытья посуды,household
+чистящее средство,household
+средство для пола,household
+средство для стекол,household
+отбеливатель,household
+освежитель воздуха,household
+бумажные полотенца,household
+туалетная бумага,household
+салфетки влажные,household
+губки кухонные,household
+пакеты для мусора,household
+фольга пищевая,household
+перчатки хозяйственные,household
+мешки для мусора,household
+парацетамол,medicine
+ибупрофен,medicine
+аспирин,medicine
+цитрамон,medicine
+витамин c,medicine
+витамины комплекс,medicine
+бинт стерильный,medicine
+пластырь бактерицидный,medicine
+капли от насморка,medicine
+спрей для горла,medicine
+сироп от кашля,medicine
+таблетки от кашля,medicine
+антисептик,medicine
+перекись водорода,medicine
+хлоргексидин,medicine
+термометр,medicine
+маска медицинская,medicine
+активированный уголь,medicine
+мазь лечебная,medicine
+раствор для ингаляций,medicine
+зубная паста,personal_care
+зубная щетка,personal_care
+шампунь,personal_care
+бальзам для волос,personal_care
+гель для душа,personal_care
+мыло жидкое,personal_care
+мыло туалетное,personal_care
+дезодорант,personal_care
+крем для рук,personal_care
+крем для лица,personal_care
+бритвенный станок,personal_care
+пена для бритья,personal_care
+ватные диски,personal_care
+ватные палочки,personal_care
+прокладки гигиенические,personal_care
+гигиенические салфетки,personal_care
+ополаскиватель для рта,personal_care
+лосьон для тела,personal_care
+маска для волос,personal_care
+гель для умывания,personal_care

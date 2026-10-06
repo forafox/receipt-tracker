@@ -5,14 +5,20 @@ description = "Expense tracker based on receipt photos"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "accelerate>=1.12.0",
     "aiogram>=3.13",
+    "datasets>=4.4.0",
+    "fastapi>=0.122.0",
     "opencv-python>=5.0.0.93",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.5",
+    "torch>=2.9.0",
+    "transformers>=4.57.0",
 ]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.0",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
@@ -41,6 +47,8 @@ preview = true
 explicit-preview-rules = true
 
 [tool.ruff.lint.per-file-ignores]
+"categorize/**/*.py" = ["D101", "D102", "D103", "D417", "DOC102", "DOC201"]
+"common/models.py" = ["D101"]
 "tests/**/*.py" = ["D101", "D102", "D103", "D417", "DOC102", "DOC201"]
 
 [tool.ruff.lint.pydocstyle]
@@ -49,6 +57,7 @@ convention = "google"
 [tool.mypy]
 strict = true
 plugins = ["pydantic.mypy"]
+disable_error_code = ["import-untyped"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
