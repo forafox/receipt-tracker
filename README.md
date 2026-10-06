@@ -50,12 +50,24 @@ Telegram-бот на aiogram 3. Принимает от пользователя
 ### Запуск
 
 ```bash
-uv sync
+make setup
 cp .env.example .env  # вписать токен бота в BOT_TOKEN
 uv run python -m bot
 ```
 
-Тесты: `uv run pytest`.
+Тесты: `make test`.
+
+## Разработка
+
+После клонирования настройте окружение и запустите все проверки:
+
+```bash
+make setup
+make check
+```
+
+Применить каноническое форматирование: `make format`. Подробные правила разработки описаны в
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Команда
 

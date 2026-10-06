@@ -9,7 +9,9 @@ async def run_middleware(data: dict[str, Any]) -> dict[str, Any]:
     handler = AsyncMock()
     await LanguageMiddleware()(handler, MagicMock(), data)
     handler.assert_awaited_once()
-    result: dict[str, Any] = handler.await_args.args[1]
+    call = handler.await_args
+    assert call is not None
+    result: dict[str, Any] = call.args[1]
     return result
 
 

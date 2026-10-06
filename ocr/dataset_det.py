@@ -50,7 +50,14 @@ def _ru_split_dir(split: str) -> str:
 
 
 def receipt_uuid(stem: str) -> str:
-    """Recognition crop names look like ``<uuid>_line_7`` / ``<uuid>_date``."""
+    """Extract a receipt identifier from a recognition crop stem.
+
+    Args:
+        stem: Crop filename stem such as ``<uuid>_line_7`` or ``<uuid>_date``.
+
+    Returns:
+        Receipt UUID prefix shared by related crops.
+    """
     return stem.split("_", 1)[0]
 
 
@@ -66,10 +73,16 @@ def _parse_ocr_text(txt_path: Path) -> str:
 
 @lru_cache(maxsize=4)
 def load_ocr_index(root: Path) -> dict[str, list[str]]:
-    """Map receipt UUID -> OCR line texts, across all recognition splits.
+    """Map receipt UUIDs to OCR line texts across all recognition splits.
 
     The CORU recognition crops share receipt UUIDs with detection images, so
     they are the only local signal for a receipt's language.
+
+    Args:
+        root: Root directory containing recognition datasets.
+
+    Returns:
+        OCR line texts grouped by receipt UUID.
     """
     index: dict[str, list[str]] = {}
     for split in ("test", "train", "val"):
@@ -84,6 +97,14 @@ def load_ocr_index(root: Path) -> dict[str, list[str]]:
 
 
 def arabic_ratio(texts: list[str]) -> float:
+    """Calculate the share of OCR lines containing Arabic characters.
+
+    Args:
+        texts: OCR line texts to inspect.
+
+    Returns:
+        Fraction of lines containing at least one Arabic character.
+    """
     if not texts:
         return 0.0
     return sum(1 for text in texts if contains_arabic(text)) / len(texts)
@@ -111,6 +132,11 @@ class DetectionDataset(ABC):
 
     @property
     def image_paths(self) -> list[Path]:
+        """Return image paths represented by this dataset.
+
+        Returns:
+            Paths in dataset iteration order.
+        """
         return [path for path, _ in self._items]
 
     def __getitem__(self, index: int) -> tuple[np.ndarray, list[Box]]:
@@ -120,9 +146,7 @@ class DetectionDataset(ABC):
             raise FileNotFoundError(f"Cannot read image: {image_path}")
         height, width = image.shape[:2]
         boxes = [
-            box
-            for box in (_to_pixels(raw, width, height) for raw in normalized)
-            if box is not None
+            box for box in (_to_pixels(raw, width, height) for raw in normalized) if box is not None
         ]
         return image, boxes
 
@@ -151,9 +175,7 @@ class EngDetectionDataset(DetectionDataset):
 
     def _load(self) -> list[_Item]:
         if self.split not in _ENG_IMAGE_DIRS:
-            raise ValueError(
-                f"Unsupported eng split {self.split!r}; expected one of {_ENG_SPLITS}"
-            )
+            raise ValueError(f"Unsupported eng split {self.split!r}; expected one of {_ENG_SPLITS}")
 
         images_dir = self.root / _ENG_IMAGE_DIRS[self.split]
         json_path = self.root / "detection/eng_arab" / f"{self.split}.json"
@@ -184,9 +206,7 @@ class EngDetectionDataset(DetectionDataset):
                 (x / width, y / height, (x + w) / width, (y + h) / height)
             )
 
-        ocr_index: dict[str, list[str]] = (
-            load_ocr_index(self.root) if self.exclude_arabic else {}
-        )
+        ocr_index: dict[str, list[str]] = load_ocr_index(self.root) if self.exclude_arabic else {}
 
         items: list[_Item] = []
         for image_id, (file_name, _, _) in sizes.items():
@@ -210,9 +230,7 @@ class RuDetectionDataset(DetectionDataset):
     def _load(self) -> list[_Item]:
         split = _ru_split_dir(self.split)
         if split not in _RU_SPLITS:
-            raise ValueError(
-                f"Unsupported ru split {self.split!r}; expected one of {_RU_SPLITS}"
-            )
+            raise ValueError(f"Unsupported ru split {self.split!r}; expected one of {_RU_SPLITS}")
 
         base = self.root / "detection/ru"
         jsonl_path = base / "annotations" / f"{split}.jsonl"
@@ -261,6 +279,19 @@ def build_detection_dataset(
     arabic_threshold: float = 0.25,
     drop_unknown: bool = False,
 ) -> DetectionDataset:
+    """Build a receipt text-detection dataset for a supported source.
+
+    Args:
+        source: Dataset source identifier, either ``eng`` or ``ru``.
+        split: Dataset split to load.
+        root: Optional dataset root overriding the repository default.
+        exclude_arabic: Whether to exclude Arabic receipts from the English source.
+        arabic_threshold: Maximum allowed ratio of Arabic OCR lines.
+        drop_unknown: Whether to drop receipts without OCR labels for language detection.
+
+    Returns:
+        Detection dataset configured for the requested source and split.
+    """
     if source == "eng":
         return EngDetectionDataset(
             split,

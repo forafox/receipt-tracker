@@ -11,15 +11,21 @@ import numpy as np
 
 DATASET_ROOT = Path(__file__).resolve().parents[1] / "dataset"
 
-ARABIC_RE = re.compile(
-    r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]"
-)
+ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
 
 _BoxN = tuple[float, float, float, float]
 _IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png")
 
 
 def contains_arabic(text: str) -> bool:
+    """Check whether text contains an Arabic-script character.
+
+    Args:
+        text: OCR text to inspect.
+
+    Returns:
+        True when at least one Arabic-script character is present.
+    """
     return ARABIC_RE.search(text) is not None
 
 
@@ -182,6 +188,16 @@ def _polygon_to_box(bbox: Any) -> _BoxN | None:
 def build_recognition_dataset(
     source: str, split: str, root: Path | None = None
 ) -> RecognitionDataset:
+    """Build a receipt text-recognition dataset for a supported source.
+
+    Args:
+        source: Dataset source identifier, either ``eng`` or ``ru``.
+        split: Dataset split to load.
+        root: Optional dataset root overriding the repository default.
+
+    Returns:
+        Recognition dataset configured for the requested source and split.
+    """
     if source == "eng":
         return EngRecognitionDataset(split, root)
     if source == "ru":

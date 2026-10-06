@@ -34,6 +34,15 @@ _TOTAL_LABEL_REGEXES = tuple(re.compile(pattern, re.IGNORECASE) for pattern in T
 
 
 def parse_receipt(text: str, *, timezone: tzinfo) -> Receipt:
+    """Parse OCR-like receipt text into a structured receipt.
+
+    Args:
+        text: Raw text recognized from a receipt.
+        timezone: Timezone to attach to a parsed local receipt datetime.
+
+    Returns:
+        Receipt containing extracted fields and non-fatal parsing warnings.
+    """
     lines = [line.strip() for line in text.splitlines() if line.strip()]
 
     store = _extract_store(lines)

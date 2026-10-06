@@ -17,7 +17,17 @@ from ocr.dataset_rec import (
     contains_arabic,
 )
 
-pytestmark = pytest.mark.skipif(not DATASET_ROOT.is_dir(), reason="dataset not downloaded")
+_REQUIRED_DATASET_PATHS = (
+    DATASET_ROOT / "detection/eng_arab/test.json",
+    DATASET_ROOT / "detection/eng_arab/test/images",
+    DATASET_ROOT / "recognition/eng_arab/test/test",
+    DATASET_ROOT / "detection/ru/annotations/test.jsonl",
+)
+
+pytestmark = pytest.mark.skipif(
+    not all(path.exists() for path in _REQUIRED_DATASET_PATHS),
+    reason="dataset not downloaded",
+)
 
 
 def _check_boxes(image: np.ndarray, boxes: list[tuple[int, int, int, int]]) -> None:
