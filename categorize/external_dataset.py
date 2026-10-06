@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -38,16 +39,36 @@ def build_training_csv(
     seed_path: Path,
     limit: int = 2000,
     dataset_name: str = HF_DATASET,
+    max_per_category: int = 30,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     seed_examples = load_training_examples(seed_path)
     external_rows = _load_external_rows(dataset_name, limit)
+    rows = _balanced_rows(
+        [{"text": example.text, "category": example.category} for example in seed_examples],
+        external_rows,
+        max_per_category,
+    )
     with output_path.open("w", encoding="utf-8", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=["text", "category"])
         writer.writeheader()
-        for example in seed_examples:
-            writer.writerow({"text": example.text, "category": example.category})
-        writer.writerows(external_rows)
+        writer.writerows(rows)
+
+
+def _balanced_rows(
+    seed_rows: list[dict[str, str]],
+    external_rows: list[dict[str, str]],
+    max_per_category: int,
+) -> list[dict[str, str]]:
+    rows_by_category: defaultdict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in seed_rows + external_rows:
+        category = row["category"]
+        if len(rows_by_category[category]) < max_per_category:
+            rows_by_category[category].append(row)
+    balanced: list[dict[str, str]] = []
+    for category in sorted(rows_by_category):
+        balanced.extend(rows_by_category[category])
+    return balanced
 
 
 def _load_external_rows(dataset_name: str, limit: int) -> list[dict[str, str]]:

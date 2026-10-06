@@ -9,8 +9,8 @@
 - прием фото чека через Telegram-бота;
 - OCR-распознавание текста;
 - извлечение структурированного чека отдельным модулем M2;
-- категоризация позиций чека модулем M3;
-- confidence для каждой категории;
+- мультилейбл-категоризация позиций чека модулем M3;
+- confidence для каждой предсказанной категории;
 - FastAPI-интерфейс M3 для взаимодействия с остальными модулями;
 - CLI для сборки датасета, обучения и оценки модели;
 - обученная transformer-модель в репозитории;
@@ -82,8 +82,12 @@ uv.lock
       "name": "молоко цельное",
       "quantity": "1",
       "total": "89.90",
-      "category": "food",
-      "confidence": 0.93
+      "categories": [
+        {
+          "category": "food",
+          "confidence": 0.93
+        }
+      ]
     }
   ]
 }
@@ -96,6 +100,7 @@ uv.lock
 - `categorize/api.py` — FastAPI-приложение;
 - `categorize/service.py` — сервис категоризации;
 - `categorize/transformer.py` — загрузка модели и inference;
+- `categorize/lexical.py` — доменная корректировка русских товарных названий;
 - `categorize/training.py` — обучение transformer-модели;
 - `categorize/external_dataset.py` — сборка обучающего CSV из Hugging Face;
 - `categorize/dataset.py` — чтение CSV;
@@ -110,7 +115,7 @@ uv.lock
 models/category_transformer/
 ```
 
-Категории:
+Категории могут назначаться в мультилейбл-режиме. Текущий набор категорий:
 
 | Категория | Значение |
 |---|---|
@@ -147,13 +152,6 @@ uv run python -m categorize train \
   --model models/category_transformer
 ```
 
-Последний training run:
-
-```text
-eval_accuracy=0.9385
-train_loss=0.2914
-```
-
 Проверить сохраненную модель:
 
 ```bash
@@ -165,7 +163,7 @@ uv run python -m categorize eval \
 Последний eval:
 
 ```text
-accuracy=0.960 examples=322
+accuracy=0.782 examples=110
 ```
 
 ## FastAPI
@@ -190,7 +188,7 @@ http://localhost:8000/docs
 
 ### `POST /classify`
 
-Категоризирует одну позицию.
+Категоризирует одну позицию. Ответ может содержать несколько категорий.
 
 Запрос:
 
@@ -209,14 +207,18 @@ http://localhost:8000/docs
   "name": "молоко цельное",
   "quantity": "1",
   "total": "89.90",
-  "category": "food",
-  "confidence": 0.93
+  "categories": [
+    {
+      "category": "food",
+      "confidence": 0.93
+    }
+  ]
 }
 ```
 
 ### `POST /classify/items`
 
-Категоризирует список позиций.
+Категоризирует список позиций. Каждая позиция может получить несколько категорий.
 
 Запрос:
 
@@ -246,15 +248,23 @@ http://localhost:8000/docs
       "name": "шампунь",
       "quantity": "1",
       "total": "210",
-      "category": "personal_care",
-      "confidence": 0.88
+      "categories": [
+        {
+          "category": "personal_care",
+          "confidence": 0.88
+        }
+      ]
     },
     {
       "name": "хлеб",
       "quantity": "1",
       "total": "55",
-      "category": "food",
-      "confidence": 0.94
+      "categories": [
+        {
+          "category": "food",
+          "confidence": 0.94
+        }
+      ]
     }
   ]
 }
@@ -263,7 +273,7 @@ http://localhost:8000/docs
 ### `POST /classify/receipt`
 
 Основной endpoint для M2/M4. Принимает структурированный `Receipt`, возвращает
-`ClassifiedReceipt`.
+`ClassifiedReceipt`, где у каждой позиции есть список категорий.
 
 Запрос:
 
@@ -292,8 +302,12 @@ http://localhost:8000/docs
       "name": "молоко цельное",
       "quantity": "1",
       "total": "89.90",
-      "category": "food",
-      "confidence": 0.93
+      "categories": [
+        {
+          "category": "food",
+          "confidence": 0.93
+        }
+      ]
     }
   ]
 }

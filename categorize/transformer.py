@@ -7,7 +7,8 @@ from typing import Any
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from common import CategoryPrediction
+from categorize.lexical import merge_category_scores, predict_by_keywords
+from common import CategoryPrediction, CategoryScore
 
 
 class TransformerCategoryClassifier:
@@ -66,9 +67,17 @@ class TransformerCategoryClassifier:
         )
         with torch.no_grad():
             logits = self._model(**encoded).logits[0]
-            probabilities = torch.softmax(logits, dim=-1)
-        confidence, label_id = torch.max(probabilities, dim=-1)
+            probabilities = torch.sigmoid(logits)
+        scores = [
+            CategoryScore(
+                category=self._id_to_label[index],
+                confidence=round(float(probability), 4),
+            )
+            for index, probability in enumerate(probabilities.tolist())
+        ]
+        selected = [score for score in scores if score.confidence >= 0.5]
+        if not selected:
+            selected = [max(scores, key=lambda score: score.confidence)]
         return CategoryPrediction(
-            category=self._id_to_label[int(label_id.item())],
-            confidence=round(float(confidence.item()), 4),
+            categories=merge_category_scores(selected, predict_by_keywords(item_name))
         )

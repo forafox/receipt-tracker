@@ -1,5 +1,6 @@
 from common.models import (
     CategoryPrediction,
+    CategoryScore,
     ClassifiedItem,
     ClassifiedReceipt,
     Item,
@@ -8,6 +9,7 @@ from common.models import (
 
 __all__ = [
     "CategoryPrediction",
+    "CategoryScore",
     "ClassifiedReceipt",
     "ClassifiedItem",
     "Item",

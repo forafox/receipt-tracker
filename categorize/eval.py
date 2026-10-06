@@ -13,7 +13,10 @@ def evaluate(classifier: CategoryClassifier, examples: list[TrainingExample]) ->
     if not examples:
         return EvalResult(accuracy=0, examples=0)
 
-    correct = sum(
-        classifier.predict(example.text).category == example.category for example in examples
-    )
+    correct = 0
+    for example in examples:
+        expected = {label.strip() for label in example.category.split("|") if label.strip()}
+        predicted = {score.category for score in classifier.predict(example.text).categories}
+        if expected == predicted:
+            correct += 1
     return EvalResult(accuracy=correct / len(examples), examples=len(examples))

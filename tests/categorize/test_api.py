@@ -4,14 +4,16 @@ from pytest import MonkeyPatch
 import categorize.api
 from categorize.api import app, get_category_service
 from categorize.service import CategoryService
-from common import CategoryPrediction
+from common import CategoryPrediction, CategoryScore
 
 
 class FakeClassifier:
     def predict(self, item_name: str) -> CategoryPrediction:
         if "шампунь" in item_name:
-            return CategoryPrediction(category="personal_care", confidence=0.9)
-        return CategoryPrediction(category="food", confidence=0.9)
+            return CategoryPrediction(
+                categories=[CategoryScore(category="personal_care", confidence=0.9)]
+            )
+        return CategoryPrediction(categories=[CategoryScore(category="food", confidence=0.9)])
 
 
 def test_classify_endpoint_returns_category(monkeypatch: MonkeyPatch) -> None:
@@ -30,8 +32,8 @@ def test_classify_endpoint_returns_category(monkeypatch: MonkeyPatch) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["category"] == "food"
-    assert 0 <= body["confidence"] <= 1
+    assert body["categories"][0]["category"] == "food"
+    assert 0 <= body["categories"][0]["confidence"] <= 1
 
 
 def test_classify_receipt_endpoint_is_m2_to_m3_contract(monkeypatch: MonkeyPatch) -> None:
@@ -55,5 +57,5 @@ def test_classify_receipt_endpoint_is_m2_to_m3_contract(monkeypatch: MonkeyPatch
     assert response.status_code == 200
     body = response.json()
     assert body["receipt_id"] == "r-1"
-    assert body["items"][0]["category"] == "food"
-    assert body["items"][0]["confidence"] == 0.9
+    assert body["items"][0]["categories"][0]["category"] == "food"
+    assert body["items"][0]["categories"][0]["confidence"] == 0.9

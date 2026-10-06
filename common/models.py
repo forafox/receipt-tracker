@@ -18,14 +18,17 @@ class Receipt(BaseModel):
     items: list[Item] = Field(min_length=1)
 
 
-class CategoryPrediction(BaseModel):
+class CategoryScore(BaseModel):
     category: str = Field(min_length=1)
     confidence: float = Field(ge=0, le=1)
+
+
+class CategoryPrediction(BaseModel):
+    categories: list[CategoryScore] = Field(min_length=1)
 
 
 class ClassifiedItem(Item):
-    category: str = Field(min_length=1)
-    confidence: float = Field(ge=0, le=1)
+    categories: list[CategoryScore] = Field(min_length=1)
 
 
 class ClassifiedReceipt(BaseModel):

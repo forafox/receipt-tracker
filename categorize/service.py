@@ -12,8 +12,7 @@ class CategoryService:
             name=item.name,
             quantity=item.quantity,
             total=item.total,
-            category=prediction.category,
-            confidence=prediction.confidence,
+            categories=prediction.categories,
         )
 
     def classify_items(self, items: list[Item]) -> list[ClassifiedItem]:
