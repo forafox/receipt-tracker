@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from zoneinfo import ZoneInfo
 
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
@@ -7,8 +8,8 @@ from aiogram.types import BotCommand
 from bot.config import BotSettings
 from bot.handlers import router
 from bot.middleware import LanguageMiddleware
-from bot.service import StubReceiptService
 from bot.texts import DEFAULT_TEXTS, TEXTS_BY_LANGUAGE, Texts
+from pipeline import NullRecognizer, ReceiptPipeline
 
 
 def commands(texts: Texts) -> list[BotCommand]:
@@ -41,7 +42,8 @@ async def main() -> None:
     """Configure and start the Telegram bot polling loop."""
     settings = BotSettings()
     bot = Bot(token=settings.token.get_secret_value())
-    dispatcher = Dispatcher(service=StubReceiptService())
+    pipeline = ReceiptPipeline(NullRecognizer(), ZoneInfo(settings.timezone))
+    dispatcher = Dispatcher(service=pipeline)
     dispatcher.message.middleware(LanguageMiddleware())
     dispatcher.include_router(router)
     await set_commands(bot)

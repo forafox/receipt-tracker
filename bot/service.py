@@ -1,10 +1,12 @@
 from typing import Protocol
 
+from common.contracts import Receipt
+
 
 class ReceiptService(Protocol):
-    """Operations used by Telegram handlers to process receipts and reports."""
+    """Receipt processing used by Telegram handlers."""
 
-    async def process_photo(self, user_id: int, photo: bytes) -> str:
+    async def process_photo(self, user_id: int, photo: bytes) -> Receipt:
         """Process a receipt photo for a user.
 
         Args:
@@ -12,44 +14,6 @@ class ReceiptService(Protocol):
             photo: Raw receipt image bytes.
 
         Returns:
-            User-facing processing result.
+            Parsed receipt.
         """
         ...
-
-    async def monthly_report(self, user_id: int) -> str:
-        """Build a user's monthly expense report.
-
-        Args:
-            user_id: Telegram user identifier.
-
-        Returns:
-            User-facing monthly report.
-        """
-        ...
-
-
-class StubReceiptService:
-    """Placeholder receipt service used before the processing pipeline is connected."""
-
-    async def process_photo(self, user_id: int, photo: bytes) -> str:
-        """Return a placeholder response for an uploaded receipt.
-
-        Args:
-            user_id: Telegram user identifier.
-            photo: Raw receipt image bytes.
-
-        Returns:
-            Message explaining that receipt processing is unavailable.
-        """
-        return "Чек получен. Распознавание пока не подключено."
-
-    async def monthly_report(self, user_id: int) -> str:
-        """Return a placeholder monthly report response.
-
-        Args:
-            user_id: Telegram user identifier.
-
-        Returns:
-            Message explaining that monthly reports are unavailable.
-        """
-        return "Отчёт за месяц пока недоступен."
