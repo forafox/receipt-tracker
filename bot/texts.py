@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from common.contracts import Receipt
+
 
 @dataclass(frozen=True)
 class Texts:
@@ -10,6 +12,12 @@ class Texts:
         help: Usage guidance sent for the help command.
         unknown: Reply sent for unsupported messages.
         error: Reply sent when receipt processing fails.
+        unreadable: Reply sent when nothing useful was found on a photo.
+        month_unavailable: Reply sent while monthly reports are not ready.
+        store: Label for the store name.
+        date: Label for the purchase date.
+        total: Label for the receipt total.
+        not_found: Placeholder for a field that was not recognized.
         help_command: Localized help command description.
         month_command: Localized monthly report command description.
     """
@@ -18,6 +26,12 @@ class Texts:
     help: str
     unknown: str
     error: str
+    unreadable: str
+    month_unavailable: str
+    store: str
+    date: str
+    total: str
+    not_found: str
     help_command: str
     month_command: str
 
@@ -31,6 +45,12 @@ RU = Texts(
     ),
     unknown="Я понимаю только фото чеков. Список команд: /help",
     error="Не получилось обработать чек. Попробуйте ещё раз позже.",
+    unreadable="Не удалось распознать чек. Сфотографируйте его ровно и при хорошем освещении.",
+    month_unavailable="Отчёт за месяц пока недоступен.",
+    store="Магазин",
+    date="Дата",
+    total="Сумма",
+    not_found="не распознано",
     help_command="Справка",
     month_command="Расходы за месяц",
 )
@@ -45,6 +65,12 @@ EN = Texts(
     ),
     unknown="I only understand receipt photos. Commands: /help",
     error="Could not process the receipt. Please try again later.",
+    unreadable="Could not read the receipt. Take a straight photo in good light.",
+    month_unavailable="The monthly report is not available yet.",
+    store="Store",
+    date="Date",
+    total="Total",
+    not_found="not recognized",
     help_command="Help",
     month_command="Spending this month",
 )
@@ -66,3 +92,19 @@ def texts_for(language_code: str | None) -> Texts:
         return DEFAULT_TEXTS
     language = language_code.split("-")[0].lower()
     return TEXTS_BY_LANGUAGE.get(language, DEFAULT_TEXTS)
+
+
+def format_receipt(receipt: Receipt, texts: Texts) -> str:
+    """Render a parsed receipt as a user-facing message.
+
+    Args:
+        receipt: Parsed receipt.
+        texts: Localized labels.
+
+    Returns:
+        Message with the store, date and total of the receipt.
+    """
+    store = receipt.store or texts.not_found
+    date = receipt.datetime.strftime("%d.%m.%Y %H:%M") if receipt.datetime else texts.not_found
+    total = f"{receipt.total:.2f}" if receipt.total is not None else texts.not_found
+    return f"{texts.store}: {store}\n{texts.date}: {date}\n{texts.total}: {total}"
