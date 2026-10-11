@@ -1,3 +1,15 @@
-from pipeline.receipt import NullRecognizer, ReceiptPipeline, ReceiptUnreadable, TextRecognizer
+from pipeline.receipt import (
+    MonthlySummary,
+    NullRecognizer,
+    ReceiptPipeline,
+    ReceiptUnreadable,
+    TextRecognizer,
+)
 
-__all__ = ["NullRecognizer", "ReceiptPipeline", "ReceiptUnreadable", "TextRecognizer"]
+__all__ = [
+    "MonthlySummary",
+    "NullRecognizer",
+    "ReceiptPipeline",
+    "ReceiptUnreadable",
+    "TextRecognizer",
+]

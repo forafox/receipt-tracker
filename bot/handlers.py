@@ -62,7 +62,7 @@ async def handle_photo(message: Message, bot: Bot, service: ReceiptService, text
     buffer = BytesIO()
     await bot.download(message.photo[-1], destination=buffer)
     try:
-        receipt = await service.process_photo(message.from_user.id, buffer.getvalue())
+        receipt = await service.process_photo(message.from_user.id, buffer.getvalue(), message.date)
         reply = format_receipt(receipt, texts)
     except ReceiptUnreadable:
         reply = texts.unreadable

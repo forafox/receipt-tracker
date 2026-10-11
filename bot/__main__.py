@@ -10,6 +10,7 @@ from bot.handlers import router
 from bot.middleware import LanguageMiddleware
 from bot.texts import DEFAULT_TEXTS, TEXTS_BY_LANGUAGE, Texts
 from pipeline import NullRecognizer, ReceiptPipeline
+from storage import SqliteReceiptStorage
 
 
 def commands(texts: Texts) -> list[BotCommand]:
@@ -42,7 +43,8 @@ async def main() -> None:
     """Configure and start the Telegram bot polling loop."""
     settings = BotSettings()
     bot = Bot(token=settings.token.get_secret_value())
-    pipeline = ReceiptPipeline(NullRecognizer(), ZoneInfo(settings.timezone))
+    storage = SqliteReceiptStorage(settings.database_path)
+    pipeline = ReceiptPipeline(NullRecognizer(), storage, ZoneInfo(settings.timezone))
     dispatcher = Dispatcher(service=pipeline)
     dispatcher.message.middleware(LanguageMiddleware())
     dispatcher.include_router(router)
