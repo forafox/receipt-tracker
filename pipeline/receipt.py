@@ -1,10 +1,13 @@
 import asyncio
 import logging
-from datetime import tzinfo
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta, tzinfo
+from decimal import Decimal
 from typing import Protocol
 
 from common.contracts import Receipt
 from extract import parse_receipt
+from storage import ReceiptStorage
 
 logger = logging.getLogger(__name__)
 
@@ -43,25 +46,45 @@ class NullRecognizer:
         return ""
 
 
+@dataclass(frozen=True)
+class MonthlySummary:
+    """Spending of one user in one calendar month.
+
+    Attributes:
+        month: First day of the month.
+        receipt_count: Number of saved receipts.
+        total: Sum of receipt totals; receipts without a total are not counted.
+    """
+
+    month: date
+    receipt_count: int
+    total: Decimal
+
+
 class ReceiptPipeline:
     """Runs the receipt processing steps in order."""
 
-    def __init__(self, recognizer: TextRecognizer, timezone: tzinfo) -> None:
+    def __init__(
+        self, recognizer: TextRecognizer, storage: ReceiptStorage, timezone: tzinfo
+    ) -> None:
         """Create a pipeline.
 
         Args:
             recognizer: OCR step.
-            timezone: Timezone of the local time printed on receipts.
+            storage: Storage for parsed receipts.
+            timezone: Timezone of the local time printed on receipts and of month boundaries.
         """
         self._recognizer = recognizer
+        self._storage = storage
         self._timezone = timezone
 
-    async def process_photo(self, user_id: int, photo: bytes) -> Receipt:
-        """Recognize and parse a receipt photo.
+    async def process_photo(self, user_id: int, photo: bytes, received_at: datetime) -> Receipt:
+        """Recognize, parse and save a receipt photo.
 
         Args:
             user_id: Telegram user identifier.
             photo: Raw receipt image bytes.
+            received_at: Time the photo was sent; used when the receipt has no date.
 
         Returns:
             Parsed receipt.
@@ -73,5 +96,27 @@ class ReceiptPipeline:
         receipt = parse_receipt(text, timezone=self._timezone)
         if receipt.datetime is None and receipt.total is None:
             raise ReceiptUnreadable
-        logger.info("Parsed receipt for user %s, warnings: %s", user_id, receipt.warnings)
+        purchased_at = receipt.datetime or received_at
+        await asyncio.to_thread(self._storage.save, user_id, receipt, purchased_at)
+        logger.info("Saved receipt for user %s, warnings: %s", user_id, receipt.warnings)
         return receipt
+
+    async def monthly_summary(self, user_id: int, moment: datetime) -> MonthlySummary:
+        """Sum a user's spending for the month containing a moment.
+
+        Args:
+            user_id: Telegram user identifier.
+            moment: Timezone-aware moment inside the month.
+
+        Returns:
+            Spending summary for the month.
+        """
+        start = moment.astimezone(self._timezone).replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        end = (start + timedelta(days=32)).replace(day=1)
+        receipts = await asyncio.to_thread(self._storage.list_between, user_id, start, end)
+        total = sum(
+            (receipt.total for receipt in receipts if receipt.total is not None), Decimal(0)
+        )
+        return MonthlySummary(month=start.date(), receipt_count=len(receipts), total=total)
