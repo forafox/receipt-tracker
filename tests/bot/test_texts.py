@@ -1,7 +1,11 @@
+from datetime import date
+from decimal import Decimal
+
 import pytest
 
-from bot.texts import EN, RU, format_receipt, texts_for
+from bot.texts import EN, RU, format_monthly_summary, format_receipt, texts_for
 from common.contracts import Receipt
+from pipeline import MonthlySummary
 
 
 @pytest.mark.parametrize(
@@ -18,3 +22,9 @@ def test_format_receipt_marks_missing_fields() -> None:
     assert format_receipt(receipt, RU) == (
         "Магазин: ЛЕНТА\nДата: не распознано\nСумма: не распознано"
     )
+
+
+def test_format_monthly_summary_without_receipts() -> None:
+    summary = MonthlySummary(month=date(2026, 10, 1), receipt_count=0, total=Decimal(0))
+
+    assert format_monthly_summary(summary, EN) == EN.month_empty

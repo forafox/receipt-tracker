@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from common.contracts import Receipt
+from pipeline import MonthlySummary
 
 
 @dataclass(frozen=True)
@@ -13,7 +14,9 @@ class Texts:
         unknown: Reply sent for unsupported messages.
         error: Reply sent when receipt processing fails.
         unreadable: Reply sent when nothing useful was found on a photo.
-        month_unavailable: Reply sent while monthly reports are not ready.
+        month_empty: Reply sent when no receipts were saved this month.
+        month_spending: Label for the monthly spending.
+        receipt_count: Label for the number of receipts.
         store: Label for the store name.
         date: Label for the purchase date.
         total: Label for the receipt total.
@@ -27,7 +30,9 @@ class Texts:
     unknown: str
     error: str
     unreadable: str
-    month_unavailable: str
+    month_empty: str
+    month_spending: str
+    receipt_count: str
     store: str
     date: str
     total: str
@@ -46,7 +51,9 @@ RU = Texts(
     unknown="Я понимаю только фото чеков. Список команд: /help",
     error="Не получилось обработать чек. Попробуйте ещё раз позже.",
     unreadable="Не удалось распознать чек. Сфотографируйте его ровно и при хорошем освещении.",
-    month_unavailable="Отчёт за месяц пока недоступен.",
+    month_empty="В этом месяце чеков пока нет.",
+    month_spending="Расходы за",
+    receipt_count="Чеков",
     store="Магазин",
     date="Дата",
     total="Сумма",
@@ -66,7 +73,9 @@ EN = Texts(
     unknown="I only understand receipt photos. Commands: /help",
     error="Could not process the receipt. Please try again later.",
     unreadable="Could not read the receipt. Take a straight photo in good light.",
-    month_unavailable="The monthly report is not available yet.",
+    month_empty="No receipts this month yet.",
+    month_spending="Spending for",
+    receipt_count="Receipts",
     store="Store",
     date="Date",
     total="Total",
@@ -108,3 +117,21 @@ def format_receipt(receipt: Receipt, texts: Texts) -> str:
     date = receipt.datetime.strftime("%d.%m.%Y %H:%M") if receipt.datetime else texts.not_found
     total = f"{receipt.total:.2f}" if receipt.total is not None else texts.not_found
     return f"{texts.store}: {store}\n{texts.date}: {date}\n{texts.total}: {total}"
+
+
+def format_monthly_summary(summary: MonthlySummary, texts: Texts) -> str:
+    """Render monthly spending as a user-facing message.
+
+    Args:
+        summary: Spending summary for one month.
+        texts: Localized labels.
+
+    Returns:
+        Message with the month total and the number of receipts.
+    """
+    if summary.receipt_count == 0:
+        return texts.month_empty
+    return (
+        f"{texts.month_spending} {summary.month:%m.%Y}: {summary.total:.2f}\n"
+        f"{texts.receipt_count}: {summary.receipt_count}"
+    )

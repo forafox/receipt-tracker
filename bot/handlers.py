@@ -6,7 +6,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
 from bot.service import ReceiptService
-from bot.texts import Texts, format_receipt
+from bot.texts import Texts, format_monthly_summary, format_receipt
 from pipeline import ReceiptUnreadable
 
 logger = logging.getLogger(__name__)
@@ -37,14 +37,18 @@ async def handle_help(message: Message, texts: Texts) -> None:
 
 
 @router.message(Command("month"))
-async def handle_month(message: Message, texts: Texts) -> None:
-    """Send the current user's monthly expense report.
+async def handle_month(message: Message, service: ReceiptService, texts: Texts) -> None:
+    """Send the current user's spending for the current month.
 
     Args:
         message: Incoming Telegram month-command message.
+        service: Receipt service that sums monthly spending.
         texts: Localized response texts.
     """
-    await message.answer(texts.month_unavailable)
+    if message.from_user is None:
+        return
+    summary = await service.monthly_summary(message.from_user.id, message.date)
+    await message.answer(format_monthly_summary(summary, texts))
 
 
 @router.message(F.photo)
