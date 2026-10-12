@@ -30,3 +30,6 @@ htmlcov/
 
 # Data
 dataset/
+
+# OCR preview output
+ocr/_preview/
