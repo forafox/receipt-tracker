@@ -1,4 +1,4 @@
-.PHONY: setup format format-check lint typecheck test check
+.PHONY: setup format format-check lint typecheck test test-slow check
 
 setup:
 	uv sync --locked --group dev
@@ -17,5 +17,8 @@ typecheck:
 
 test:
 	uv run pytest
+
+test-slow:
+	uv run pytest -m slow
 
 check: format-check lint typecheck test

@@ -45,3 +45,41 @@
 - **Сборка JSON / dataclass** — структурированный объект чека.
 - **Добавление confidence и bbox** — диагностическая информация для отладки и доверия.
 - **Возврат наружу** — без сохранения в БД/файл; ошибки качества и частичные результаты возвращаются тем же путём.
+
+## Движки OCR
+
+Реализованы два взаимозаменяемых движка за общим контрактом из `common/ocr.py`:
+
+| Движок | Класс | Зависимости |
+|---|---|---|
+| Tesseract | `ocr.tesseract_engine.TesseractEngine` | `pytesseract` + бинарь `tesseract` |
+| EasyOCR | `ocr.easyocr_engine.EasyOcrEngine` | `easyocr` (первый запуск скачивает веса) |
+
+Контракт:
+
+- `TextBlock` — распознанный фрагмент: `text`, `bbox` (4 точки-полигона в пикселях), `confidence`.
+- `OcrResult` — список блоков и размеры исходного изображения.
+- `OcrEngine` — протокол с методами `recognize_blocks(image: bytes) -> OcrResult` и
+  `recognize(image: bytes) -> str`. Второй метод совпадает с `pipeline.TextRecognizer`, поэтому
+  движок можно передать в пайплайн без адаптера.
+
+Выбор движка — через конфиг (`ocr.config.OcrSettings`, переменные окружения с префиксом `OCR_`):
+`OCR_ENGINE`, `OCR_TESSERACT_LANGUAGES`, `OCR_EASYOCR_LANGUAGES`, `OCR_MIN_CONFIDENCE`, `OCR_GPU`.
+
+## Установка и запуск
+
+```bash
+uv sync --group dev            # бот и обычные тесты без тяжёлых движков
+uv sync --group ocr            # движки OCR
+uv run python -m ocr.preview  --engine tesseract --source eng --split test --index 0
+uv run python -m ocr.eval_ocr --engine tesseract --task rec --source eng --split test --limit 50
+uv run python -m ocr.eval_ocr --engine tesseract --task det --source ru  --split test --limit 50
+OCR_RUN_EASYOCR=1 uv run pytest -m slow
+```
+
+- `ocr.preview` рисует на изображении эталонные боксы (зелёным) и предсказания движка (красным)
+  и сохраняет PNG в `ocr/_preview/` (в `.gitignore`).
+- `ocr.eval_ocr` считает детекцию (precision/recall/F1, средний IoU) и распознавание (CER/WER,
+  точное совпадение) на детерминированной выборке из `dataset/`.
+- Тесты с реальными движками помечены `@pytest.mark.slow` и не входят в `make check`; EasyOCR
+  дополнительно требует `OCR_RUN_EASYOCR=1`, так как скачивает модели.
