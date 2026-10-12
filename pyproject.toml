@@ -24,6 +24,10 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.10",
 ]
+ocr = [
+    "pytesseract>=0.3.13",
+    "easyocr>=1.7.2",
+]
 
 [tool.ruff]
 line-length = 100
@@ -59,6 +63,14 @@ strict = true
 plugins = ["pydantic.mypy"]
 disable_error_code = ["import-untyped"]
 
+[[tool.mypy.overrides]]
+module = ["pytesseract", "easyocr"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 asyncio_mode = "auto"
+addopts = "-m 'not slow'"
+markers = [
+    "slow: requires real OCR engines, model weights or network; excluded from the default run",
+]
