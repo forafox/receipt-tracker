@@ -66,6 +66,19 @@
 Выбор движка — через конфиг (`ocr.config.OcrSettings`, переменные окружения с префиксом `OCR_`):
 `OCR_ENGINE`, `OCR_TESSERACT_LANGUAGES`, `OCR_EASYOCR_LANGUAGES`, `OCR_MIN_CONFIDENCE`, `OCR_GPU`.
 
+### Примеры работы
+
+Результат `ocr.preview` на одном и том же чеке: зелёным — эталонные боксы из `dataset/`,
+красным — предсказания движка.
+
+| EasyOCR | Tesseract |
+|---|---|
+| ![EasyOCR](./docs/preview_easyocr.jpg) | ![Tesseract](./docs/preview_tesseract.jpg) |
+
+Примеры — уменьшенные копии вывода `ocr.preview`; рабочие изображения пишутся в
+`ocr/_preview/` и в репозиторий не коммитятся.
+
+
 ## Установка и запуск
 
 ```bash
