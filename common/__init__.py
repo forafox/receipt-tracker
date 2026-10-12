@@ -6,6 +6,7 @@ from common.models import (
     Item,
     Receipt,
 )
+from common.ocr import OcrEngine, OcrResult, TextBlock
 
 __all__ = [
     "CategoryPrediction",
@@ -13,5 +14,8 @@ __all__ = [
     "ClassifiedItem",
     "ClassifiedReceipt",
     "Item",
+    "OcrEngine",
+    "OcrResult",
     "Receipt",
+    "TextBlock",
 ]
