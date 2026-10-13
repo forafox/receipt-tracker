@@ -12,7 +12,7 @@ from categorize.transformer import TransformerCategoryClassifier
 from common import ClassifiedItem, ClassifiedReceipt, Item, Receipt
 
 DEFAULT_DATASET_PATH = Path("dataset/category/training.csv")
-DEFAULT_MODEL_PATH = Path("models/category_transformer")
+DEFAULT_MODEL_PATH = Path("categorize/models/category_transformer")
 
 
 class ClassifyItemsRequest(BaseModel):
