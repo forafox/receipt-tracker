@@ -49,12 +49,12 @@ categorize/models/category_transformer/
 Основной обучающий CSV:
 
 ```text
-dataset/category/training.csv
+categorize/data/training.csv
 ```
 
 Источники данных:
 
-- локальный seed-набор `dataset/category/items.csv`;
+- локальный seed-набор `categorize/data/items.csv`;
 - Hugging Face датасет `IvanTatarkin/ru-product-taxonomy`.
 
 Собрать датасет заново:
@@ -67,7 +67,7 @@ uv run python -m categorize build-dataset --limit 300
 
 ```bash
 uv run python -m categorize train \
-  --dataset dataset/category/training.csv \
+  --dataset categorize/data/training.csv \
   --model categorize/models/category_transformer
 ```
 
@@ -79,7 +79,7 @@ stratified split, чтобы validation-fold не дублировался и м
 
 ```bash
 uv run python -m categorize eval \
-  --dataset dataset/category/training.csv \
+  --dataset categorize/data/training.csv \
   --model categorize/models/category_transformer
 ```
 
@@ -157,7 +157,7 @@ http://localhost:8000/docs
 
 ```json
 {
-  "dataset_path": "dataset/category/training.csv",
+  "dataset_path": "categorize/data/training.csv",
   "model_path": "categorize/models/category_transformer"
 }
 ```
@@ -171,5 +171,5 @@ uv run ruff format
 uv run ruff check
 uv run mypy .
 uv run pytest
-uv run python -m categorize eval --dataset dataset/category/training.csv --model categorize/models/category_transformer
+uv run python -m categorize eval --dataset categorize/data/training.csv --model categorize/models/category_transformer
 ```

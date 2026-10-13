@@ -19,7 +19,7 @@ def main() -> None:
 
     dataset_parser = subparsers.add_parser("build-dataset")
     dataset_parser.add_argument("--output", type=Path, default=DEFAULT_DATASET_PATH)
-    dataset_parser.add_argument("--seed", type=Path, default=Path("dataset/category/items.csv"))
+    dataset_parser.add_argument("--seed", type=Path, default=Path("categorize/data/items.csv"))
     dataset_parser.add_argument("--limit", type=int, default=2000)
 
     eval_parser = subparsers.add_parser("eval")

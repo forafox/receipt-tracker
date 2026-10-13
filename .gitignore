@@ -28,7 +28,7 @@ htmlcov/
 *.sqlite
 *.db
 
-# Data
+# Data (root OCR downloads)
 dataset/
 
 # OCR preview output
