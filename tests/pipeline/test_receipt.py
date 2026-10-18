@@ -6,7 +6,7 @@ import pytest
 
 from common.contracts import Receipt
 from ocr import ImageDecodeError, OcrEngineUnavailableError
-from pipeline import MonthlySummary, ReceiptPipeline, ReceiptUnreadable
+from pipeline import MonthlySummary, ReceiptAlreadySaved, ReceiptPipeline, ReceiptUnreadable
 
 MOSCOW_TIMEZONE = ZoneInfo("Europe/Moscow")
 RECEIVED_AT = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
@@ -26,8 +26,11 @@ class FakeStorage:
     def __init__(self) -> None:
         self.saved: list[tuple[int, Receipt, datetime]] = []
 
-    def save(self, user_id: int, receipt: Receipt, purchased_at: datetime) -> None:
+    def save(self, user_id: int, receipt: Receipt, purchased_at: datetime) -> bool:
+        if any(owner == user_id and saved == receipt for owner, saved, _ in self.saved):
+            return False
         self.saved.append((user_id, receipt, purchased_at))
+        return True
 
     def list_between(self, user_id: int, start: datetime, end: datetime) -> list[Receipt]:
         return [
@@ -133,3 +136,14 @@ async def test_monthly_summary_converts_moment_to_local_time() -> None:
     summary = await make_pipeline("").monthly_summary(1, late_september_utc)
 
     assert summary == MonthlySummary(month=date(2026, 10, 1), receipt_count=0, total=Decimal(0))
+
+
+async def test_same_receipt_is_rejected_on_second_upload() -> None:
+    storage = FakeStorage()
+    pipeline = make_pipeline("ПЯТЁРОЧКА\n05.10.2026 18:20\nИТОГО 250,00", storage)
+    await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    with pytest.raises(ReceiptAlreadySaved):
+        await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert len(storage.saved) == 1

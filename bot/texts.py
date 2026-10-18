@@ -14,6 +14,7 @@ class Texts:
         unknown: Reply sent for unsupported messages.
         error: Reply sent when receipt processing fails.
         unreadable: Reply sent when nothing useful was found on a photo.
+        duplicate: Reply sent when the receipt was already saved.
         month_empty: Reply sent when no receipts were saved this month.
         month_spending: Label for the monthly spending.
         receipt_count: Label for the number of receipts.
@@ -30,6 +31,7 @@ class Texts:
     unknown: str
     error: str
     unreadable: str
+    duplicate: str
     month_empty: str
     month_spending: str
     receipt_count: str
@@ -52,6 +54,7 @@ RU = Texts(
     unknown="Я понимаю только фото чеков. Список команд: /help",
     error="Не получилось обработать чек. Попробуйте ещё раз позже.",
     unreadable="Не удалось распознать чек. Сфотографируйте его ровно и при хорошем освещении.",
+    duplicate="Этот чек уже сохранён, повторно он не учитывается.",
     month_empty="В этом месяце чеков пока нет.",
     month_spending="Расходы за",
     receipt_count="Чеков",
@@ -75,6 +78,7 @@ EN = Texts(
     unknown="I only understand receipt photos. Commands: /help",
     error="Could not process the receipt. Please try again later.",
     unreadable="Could not read the receipt. Take a straight photo in good light.",
+    duplicate="This receipt is already saved and will not be counted twice.",
     month_empty="No receipts this month yet.",
     month_spending="Spending for",
     receipt_count="Receipts",

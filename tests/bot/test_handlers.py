@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from bot.handlers import handle_image_document, handle_month, handle_photo, handle_start
 from bot.texts import EN, RU
 from common.contracts import Receipt
-from pipeline import MonthlySummary, ReceiptUnreadable
+from pipeline import MonthlySummary, ReceiptAlreadySaved, ReceiptUnreadable
 
 SENT_AT = datetime(2026, 10, 11, 9, 0, tzinfo=ZoneInfo("UTC"))
 RECEIPT = Receipt(
@@ -112,3 +112,11 @@ async def test_image_document_is_processed_like_photo() -> None:
     assert bot.download.await_args.args[0] is message.document
     assert service.received == (42, b"file", SENT_AT)
     message.answer.assert_awaited_once()
+
+
+async def test_photo_reports_duplicate_receipt() -> None:
+    message = make_message()
+
+    await handle_photo(message, make_bot(b"image"), FakeService(ReceiptAlreadySaved()), RU)
+
+    message.answer.assert_awaited_once_with(RU.duplicate)

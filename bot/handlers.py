@@ -8,7 +8,7 @@ from aiogram.utils.chat_action import ChatActionSender
 
 from bot.service import ReceiptService
 from bot.texts import Texts, format_monthly_summary, format_receipt
-from pipeline import ReceiptUnreadable
+from pipeline import ReceiptAlreadySaved, ReceiptUnreadable
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +97,8 @@ async def _process_image(
             reply = format_receipt(receipt, texts)
         except ReceiptUnreadable:
             reply = texts.unreadable
+        except ReceiptAlreadySaved:
+            reply = texts.duplicate
         except Exception:
             logger.exception("Failed to process receipt image")
             reply = texts.error
