@@ -5,7 +5,8 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from common.contracts import Receipt
-from pipeline import MonthlySummary, NullRecognizer, ReceiptPipeline, ReceiptUnreadable
+from ocr import ImageDecodeError, OcrEngineUnavailableError
+from pipeline import MonthlySummary, ReceiptPipeline, ReceiptUnreadable
 
 MOSCOW_TIMEZONE = ZoneInfo("Europe/Moscow")
 RECEIVED_AT = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
@@ -76,10 +77,29 @@ async def test_unreadable_receipt_is_rejected_and_not_saved(text: str) -> None:
     assert storage.saved == []
 
 
-async def test_null_recognizer_makes_every_photo_unreadable() -> None:
-    pipeline = ReceiptPipeline(NullRecognizer(), FakeStorage(), MOSCOW_TIMEZONE)
+class FailingRecognizer:
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+    def recognize(self, image: bytes) -> str:
+        raise self.error
+
+
+async def test_undecodable_image_is_unreadable() -> None:
+    storage = FakeStorage()
+    pipeline = ReceiptPipeline(FailingRecognizer(ImageDecodeError()), storage, MOSCOW_TIMEZONE)
 
     with pytest.raises(ReceiptUnreadable):
+        await pipeline.process_photo(1, b"not an image", RECEIVED_AT)
+
+    assert storage.saved == []
+
+
+async def test_unavailable_engine_is_not_reported_as_unreadable() -> None:
+    error = OcrEngineUnavailableError("tesseract binary not found")
+    pipeline = ReceiptPipeline(FailingRecognizer(error), FakeStorage(), MOSCOW_TIMEZONE)
+
+    with pytest.raises(OcrEngineUnavailableError):
         await pipeline.process_photo(1, b"image", RECEIVED_AT)
 
 

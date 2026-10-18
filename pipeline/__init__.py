@@ -1,6 +1,5 @@
 from pipeline.receipt import (
     MonthlySummary,
-    NullRecognizer,
     ReceiptPipeline,
     ReceiptUnreadable,
     TextRecognizer,
@@ -8,7 +7,6 @@ from pipeline.receipt import (
 
 __all__ = [
     "MonthlySummary",
-    "NullRecognizer",
     "ReceiptPipeline",
     "ReceiptUnreadable",
     "TextRecognizer",
