@@ -3,7 +3,8 @@ from io import BytesIO
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message
+from aiogram.types import Downloadable, Message
+from aiogram.utils.chat_action import ChatActionSender
 
 from bot.service import ReceiptService
 from bot.texts import Texts, format_monthly_summary, format_receipt
@@ -53,26 +54,52 @@ async def handle_month(message: Message, service: ReceiptService, texts: Texts) 
 
 @router.message(F.photo)
 async def handle_photo(message: Message, bot: Bot, service: ReceiptService, texts: Texts) -> None:
-    """Download the largest receipt photo and reply with the parsed receipt.
+    """Process the largest size of a receipt photo.
 
     Args:
         message: Incoming Telegram message containing receipt photos.
-        bot: Telegram bot used to download the selected photo.
+        bot: Telegram bot used to download the photo.
         service: Receipt service that processes the downloaded image.
         texts: Localized response texts.
     """
-    if message.from_user is None or not message.photo:
+    if message.photo:
+        await _process_image(message, bot, message.photo[-1], service, texts)
+
+
+@router.message(F.document.mime_type.startswith("image/"))
+async def handle_image_document(
+    message: Message, bot: Bot, service: ReceiptService, texts: Texts
+) -> None:
+    """Process a receipt image sent as an uncompressed file.
+
+    Args:
+        message: Incoming Telegram message containing an image file.
+        bot: Telegram bot used to download the file.
+        service: Receipt service that processes the downloaded image.
+        texts: Localized response texts.
+    """
+    if message.document:
+        await _process_image(message, bot, message.document, service, texts)
+
+
+async def _process_image(
+    message: Message, bot: Bot, image: Downloadable, service: ReceiptService, texts: Texts
+) -> None:
+    if message.from_user is None:
         return
-    buffer = BytesIO()
-    await bot.download(message.photo[-1], destination=buffer)
-    try:
-        receipt = await service.process_photo(message.from_user.id, buffer.getvalue(), message.date)
-        reply = format_receipt(receipt, texts)
-    except ReceiptUnreadable:
-        reply = texts.unreadable
-    except Exception:
-        logger.exception("Failed to process receipt photo")
-        reply = texts.error
+    async with ChatActionSender.typing(bot=bot, chat_id=message.chat.id):
+        buffer = BytesIO()
+        await bot.download(image, destination=buffer)
+        try:
+            receipt = await service.process_photo(
+                message.from_user.id, buffer.getvalue(), message.date
+            )
+            reply = format_receipt(receipt, texts)
+        except ReceiptUnreadable:
+            reply = texts.unreadable
+        except Exception:
+            logger.exception("Failed to process receipt image")
+            reply = texts.error
     await message.answer(reply)
 
 
