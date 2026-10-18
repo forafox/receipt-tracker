@@ -17,6 +17,10 @@ class ReceiptUnreadable(Exception):
     """Raised when no useful receipt data can be extracted from a photo."""
 
 
+class ReceiptAlreadySaved(Exception):
+    """Raised when the user has already saved the same receipt."""
+
+
 class TextRecognizer(Protocol):
     """OCR step that turns a receipt image into plain text."""
 
@@ -78,6 +82,7 @@ class ReceiptPipeline:
         Raises:
             ReceiptUnreadable: If the image cannot be decoded or neither the date nor the total
                 was found.
+            ReceiptAlreadySaved: If the user has already saved the same receipt.
         """
         try:
             text = await asyncio.to_thread(self._recognizer.recognize, photo)
@@ -87,7 +92,9 @@ class ReceiptPipeline:
         if receipt.datetime is None and receipt.total is None:
             raise ReceiptUnreadable
         purchased_at = receipt.datetime or received_at
-        await asyncio.to_thread(self._storage.save, user_id, receipt, purchased_at)
+        saved = await asyncio.to_thread(self._storage.save, user_id, receipt, purchased_at)
+        if not saved:
+            raise ReceiptAlreadySaved
         logger.info("Saved receipt for user %s, warnings: %s", user_id, receipt.warnings)
         return receipt
 
