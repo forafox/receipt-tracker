@@ -23,6 +23,7 @@ def build_ocr_engine(settings: OcrSettings | None = None) -> OcrEngine:
         return TesseractEngine(
             languages=resolved.tesseract_languages,
             min_confidence=resolved.min_confidence,
+            tesseract_config=resolved.tesseract_config,
         )
     if resolved.engine == "easyocr":
         from ocr.engines.easyocr import EasyOcrEngine
