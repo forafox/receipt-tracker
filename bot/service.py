@@ -43,3 +43,14 @@ class ReceiptService(Protocol):
             Receipts ordered from the newest to the oldest.
         """
         ...
+
+    async def undo_last(self, user_id: int) -> Receipt | None:
+        """Delete the receipt the user saved most recently.
+
+        Args:
+            user_id: Telegram user identifier.
+
+        Returns:
+            Deleted receipt, or None if the user has no receipts.
+        """
+        ...

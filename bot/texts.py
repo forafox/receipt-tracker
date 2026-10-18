@@ -19,6 +19,8 @@ class Texts:
         month_spending: Label for the monthly spending.
         history_empty: Reply sent when the user has no saved receipts.
         history_title: Heading of the recent receipts list.
+        undo_done: Heading of the reply about a deleted receipt.
+        undo_empty: Reply sent when there is nothing to delete.
         receipt_count: Label for the number of receipts.
         store: Label for the store name.
         date: Label for the purchase date.
@@ -27,6 +29,7 @@ class Texts:
         help_command: Localized help command description.
         month_command: Localized monthly report command description.
         history_command: Localized recent receipts command description.
+        undo_command: Localized undo command description.
     """
 
     start: str
@@ -39,6 +42,8 @@ class Texts:
     month_spending: str
     history_empty: str
     history_title: str
+    undo_done: str
+    undo_empty: str
     receipt_count: str
     store: str
     date: str
@@ -47,6 +52,7 @@ class Texts:
     help_command: str
     month_command: str
     history_command: str
+    undo_command: str
 
 
 RU = Texts(
@@ -56,6 +62,7 @@ RU = Texts(
         "Если отправить его файлом, качество будет выше.\n"
         "/month — расходы за текущий месяц\n"
         "/history — последние чеки\n"
+        "/undo — удалить последний сохранённый чек\n"
         "/help — эта справка"
     ),
     unknown="Я понимаю только фото чеков. Список команд: /help",
@@ -66,6 +73,8 @@ RU = Texts(
     month_spending="Расходы за",
     history_empty="Сохранённых чеков пока нет.",
     history_title="Последние чеки:",
+    undo_done="Удалён чек:",
+    undo_empty="Удалять нечего, сохранённых чеков нет.",
     receipt_count="Чеков",
     store="Магазин",
     date="Дата",
@@ -74,6 +83,7 @@ RU = Texts(
     help_command="Справка",
     month_command="Расходы за месяц",
     history_command="Последние чеки",
+    undo_command="Удалить последний чек",
 )
 
 EN = Texts(
@@ -84,6 +94,7 @@ EN = Texts(
         "Sending it as a file keeps the quality higher.\n"
         "/month — spending for the current month\n"
         "/history — recent receipts\n"
+        "/undo — delete the last saved receipt\n"
         "/help — this message"
     ),
     unknown="I only understand receipt photos. Commands: /help",
@@ -94,6 +105,8 @@ EN = Texts(
     month_spending="Spending for",
     history_empty="No saved receipts yet.",
     history_title="Recent receipts:",
+    undo_done="Deleted receipt:",
+    undo_empty="Nothing to delete, there are no saved receipts.",
     receipt_count="Receipts",
     store="Store",
     date="Date",
@@ -102,6 +115,7 @@ EN = Texts(
     help_command="Help",
     month_command="Spending this month",
     history_command="Recent receipts",
+    undo_command="Delete the last receipt",
 )
 
 TEXTS_BY_LANGUAGE = {"ru": RU, "en": EN}

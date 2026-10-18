@@ -10,6 +10,7 @@ from bot.handlers import (
     handle_month,
     handle_photo,
     handle_start,
+    handle_undo,
 )
 from bot.texts import EN, RU
 from common.contracts import Receipt
@@ -24,8 +25,9 @@ RECEIPT = Receipt(
 
 
 class FakeService:
-    def __init__(self, error: Exception | None = None) -> None:
+    def __init__(self, error: Exception | None = None, last: Receipt | None = RECEIPT) -> None:
         self.error = error
+        self.last = last
         self.received: tuple[int, bytes, datetime] | None = None
         self.received_month: tuple[int, datetime] | None = None
 
@@ -34,6 +36,9 @@ class FakeService:
             raise self.error
         self.received = (user_id, photo, received_at)
         return RECEIPT
+
+    async def undo_last(self, user_id: int) -> Receipt | None:
+        return self.last
 
     async def recent_receipts(self, user_id: int) -> list[Receipt]:
         return [RECEIPT, Receipt()]
@@ -141,3 +146,21 @@ async def test_history_lists_recent_receipts() -> None:
         "05.10.2026, ПЯТЁРОЧКА, 250.00\n"
         "not recognized, not recognized, not recognized"
     )
+
+
+async def test_undo_reports_deleted_receipt() -> None:
+    message = make_message()
+
+    await handle_undo(message, FakeService(), RU)
+
+    message.answer.assert_awaited_once_with(
+        "Удалён чек:\nМагазин: ПЯТЁРОЧКА\nДата: 05.10.2026 18:20\nСумма: 250.00"
+    )
+
+
+async def test_undo_without_receipts() -> None:
+    message = make_message()
+
+    await handle_undo(message, FakeService(last=None), EN)
+
+    message.answer.assert_awaited_once_with(EN.undo_empty)

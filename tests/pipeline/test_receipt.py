@@ -39,6 +39,12 @@ class FakeStorage:
             if owner == user_id and start <= purchased_at < end
         ]
 
+    def delete_last(self, user_id: int) -> Receipt | None:
+        for index in range(len(self.saved) - 1, -1, -1):
+            if self.saved[index][0] == user_id:
+                return self.saved.pop(index)[1]
+        return None
+
     def list_recent(self, user_id: int, limit: int) -> list[Receipt]:
         receipts = [receipt for owner, receipt, _ in self.saved if owner == user_id]
         return receipts[::-1][:limit]
@@ -161,3 +167,15 @@ async def test_recent_receipts_are_limited_to_history_size() -> None:
     receipts = await make_pipeline("", storage).recent_receipts(1)
 
     assert [receipt.store for receipt in receipts] == [f"store {n}" for n in range(6, 1, -1)]
+
+
+async def test_undo_deletes_last_receipt_of_user() -> None:
+    storage = FakeStorage()
+    storage.save(1, Receipt(store="first"), RECEIVED_AT)
+    storage.save(1, Receipt(store="second"), RECEIVED_AT)
+    storage.save(2, Receipt(store="other user"), RECEIVED_AT)
+
+    deleted = await make_pipeline("", storage).undo_last(1)
+
+    assert deleted == Receipt(store="second")
+    assert [receipt.store for _, receipt, _ in storage.saved] == ["first", "other user"]

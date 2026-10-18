@@ -89,3 +89,32 @@ def test_list_recent_returns_newest_first(tmp_path: Path) -> None:
     receipts = storage.list_recent(1, limit=2)
 
     assert [receipt.store for receipt in receipts] == ["same time, saved later", "new"]
+
+
+def test_delete_last_removes_most_recently_saved_receipt(tmp_path: Path) -> None:
+    storage = SqliteReceiptStorage(tmp_path / "receipts.sqlite")
+    storage.save(1, Receipt(store="saved first, newer date"), NOVEMBER)
+    storage.save(1, Receipt(store="saved last, older date"), OCTOBER)
+    storage.save(2, Receipt(store="other user"), OCTOBER)
+
+    deleted = storage.delete_last(1)
+
+    assert deleted == Receipt(store="saved last, older date")
+    assert [receipt.store for receipt in storage.list_recent(1, limit=5)] == [
+        "saved first, newer date"
+    ]
+    assert len(storage.list_recent(2, limit=5)) == 1
+
+
+def test_delete_last_without_receipts(tmp_path: Path) -> None:
+    storage = SqliteReceiptStorage(tmp_path / "receipts.sqlite")
+
+    assert storage.delete_last(1) is None
+
+
+def test_deleted_receipt_can_be_saved_again(tmp_path: Path) -> None:
+    storage = SqliteReceiptStorage(tmp_path / "receipts.sqlite")
+    storage.save(1, FULL_RECEIPT, OCTOBER)
+    storage.delete_last(1)
+
+    assert storage.save(1, FULL_RECEIPT, OCTOBER) is True
