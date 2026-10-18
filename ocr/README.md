@@ -50,6 +50,7 @@
 
 ```
 ocr/
+  service.py  # центральный сервис OcrService, выбирающий движок по конфигу
   core/       # конфиг, ошибки, геометрия, порядок блоков, метрики
   engines/    # tesseract.py, easyocr.py, factory.py
   datasets/   # detection.py, recognition.py, viewer.py
@@ -74,7 +75,24 @@ ocr/
   движок можно передать в пайплайн без адаптера.
 
 Выбор движка — через конфиг (`ocr.core.config.OcrSettings`, переменные окружения с префиксом `OCR_`):
-`OCR_ENGINE`, `OCR_TESSERACT_LANGUAGES`, `OCR_EASYOCR_LANGUAGES`, `OCR_MIN_CONFIDENCE`, `OCR_GPU`.
+`OCR_ENGINE`, `OCR_TESSERACT_LANGUAGES`, `OCR_EASYOCR_LANGUAGES`, `OCR_MIN_CONFIDENCE`, `OCR_GPU`,
+`OCR_TESSERACT_CONFIG`.
+
+### Сервис OCR
+
+Центральная точка входа — `ocr.service.OcrService`. Он выбирает движок по конфигу и лениво
+создаёт его при первом вызове, поэтому импорт `ocr` остаётся лёгким:
+
+```python
+from ocr import OcrService, build_default_ocr_service
+
+service = build_default_ocr_service()  # конфиг из окружения/.env
+result = service.process_receipt(image_bytes)  # OcrResult: текст + bbox
+text = service.recognize(image_bytes)  # plain text (совместим с pipeline)
+```
+
+`OcrService` сам реализует контракт `OcrEngine`, поэтому его можно подставить в
+`pipeline.ReceiptPipeline` вместо `NullRecognizer` без адаптера.
 
 ### Примеры работы
 
@@ -117,3 +135,17 @@ OCR_RUN_EASYOCR=1 uv run pytest -m slow
 - Новые точки входа: `python -m ocr.tools.preview`, `python -m ocr.tools.eval_ocr`,
   `python -m ocr.datasets.viewer`.
 - `make check` проходит; slow-тест Tesseract проходит, EasyOCR требует `OCR_RUN_EASYOCR=1`.
+
+## Изменения в ветке `feat/ocr-service`
+
+- Добавлен центральный сервис `ocr.service.OcrService`: выбирает движок по `OcrSettings`,
+  лениво создаёт его при первом вызове и сам реализует контракт `OcrEngine`.
+- Методы сервиса: `process_receipt(image)` и `recognize_blocks(image)` возвращают `OcrResult`
+  (текст + bbox), `recognize(image)` — plain text, совместимый с `pipeline.TextRecognizer`.
+- Добавлен `build_default_ocr_service()` — сервис с конфигом по умолчанию/из окружения.
+- В `OcrSettings` добавлен `tesseract_config`; значение прокидывается в `TesseractEngine`.
+- `OcrService` и `build_default_ocr_service` экспортируются из `ocr/__init__.py`.
+- В `.env.example` добавлены переменные `OCR_ENGINE`, `OCR_TESSERACT_LANGUAGES`,
+  `OCR_EASYOCR_LANGUAGES`, `OCR_MIN_CONFIDENCE`, `OCR_GPU`, `OCR_TESSERACT_CONFIG`.
+- Добавлены тесты `tests/ocr/test_service.py`: делегирование движку, ленивое создание,
+  совместимость с `OcrEngine` и `pipeline.TextRecognizer`.
