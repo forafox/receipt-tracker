@@ -46,14 +46,24 @@
 - **Добавление confidence и bbox** — диагностическая информация для отладки и доверия.
 - **Возврат наружу** — без сохранения в БД/файл; ошибки качества и частичные результаты возвращаются тем же путём.
 
+## Структура пакета
+
+```
+ocr/
+  core/       # конфиг, ошибки, геометрия, порядок блоков, метрики
+  engines/    # tesseract.py, easyocr.py, factory.py
+  datasets/   # detection.py, recognition.py, viewer.py
+  tools/      # preview.py, eval_ocr.py
+```
+
 ## Движки OCR
 
 Реализованы два взаимозаменяемых движка за общим контрактом из `common/ocr.py`:
 
 | Движок | Класс | Зависимости |
 |---|---|---|
-| Tesseract | `ocr.tesseract_engine.TesseractEngine` | `pytesseract` + бинарь `tesseract` |
-| EasyOCR | `ocr.easyocr_engine.EasyOcrEngine` | `easyocr` (первый запуск скачивает веса) |
+| Tesseract | `ocr.engines.tesseract.TesseractEngine` | `pytesseract` + бинарь `tesseract` |
+| EasyOCR | `ocr.engines.easyocr.EasyOcrEngine` | `easyocr` (первый запуск скачивает веса) |
 
 Контракт:
 
@@ -63,19 +73,19 @@
   `recognize(image: bytes) -> str`. Второй метод совпадает с `pipeline.TextRecognizer`, поэтому
   движок можно передать в пайплайн без адаптера.
 
-Выбор движка — через конфиг (`ocr.config.OcrSettings`, переменные окружения с префиксом `OCR_`):
+Выбор движка — через конфиг (`ocr.core.config.OcrSettings`, переменные окружения с префиксом `OCR_`):
 `OCR_ENGINE`, `OCR_TESSERACT_LANGUAGES`, `OCR_EASYOCR_LANGUAGES`, `OCR_MIN_CONFIDENCE`, `OCR_GPU`.
 
 ### Примеры работы
 
-Результат `ocr.preview` на одном и том же чеке: зелёным — эталонные боксы из `dataset/`,
+Результат `ocr.tools.preview` на одном и том же чеке: зелёным — эталонные боксы из `dataset/`,
 красным — предсказания движка.
 
 | EasyOCR | Tesseract |
 |---|---|
 | ![EasyOCR](./docs/preview_easyocr.jpg) | ![Tesseract](./docs/preview_tesseract.jpg) |
 
-Примеры — уменьшенные копии вывода `ocr.preview`; рабочие изображения пишутся в
+Примеры — уменьшенные копии вывода `ocr.tools.preview`; рабочие изображения пишутся в
 `ocr/_preview/` и в репозиторий не коммитятся.
 
 
@@ -84,15 +94,16 @@
 ```bash
 uv sync --group dev            # бот и обычные тесты без тяжёлых движков
 uv sync --group ocr            # движки OCR
-uv run python -m ocr.preview  --engine tesseract --source eng --split test --index 0
-uv run python -m ocr.eval_ocr --engine tesseract --task rec --source eng --split test --limit 50
-uv run python -m ocr.eval_ocr --engine tesseract --task det --source ru  --split test --limit 50
+uv run python -m ocr.tools.preview  --engine tesseract --source eng --split test --index 0
+uv run python -m ocr.tools.eval_ocr --engine tesseract --task rec --source eng --split test --limit 50
+uv run python -m ocr.tools.eval_ocr --engine tesseract --task det --source ru  --split test --limit 50
+uv run python -m ocr.datasets.viewer --task det --source eng --split test --count 5
 OCR_RUN_EASYOCR=1 uv run pytest -m slow
 ```
 
-- `ocr.preview` рисует на изображении эталонные боксы (зелёным) и предсказания движка (красным)
-  и сохраняет PNG в `ocr/_preview/` (в `.gitignore`).
-- `ocr.eval_ocr` считает детекцию (precision/recall/F1, средний IoU) и распознавание (CER/WER,
+- `ocr.tools.preview` рисует на изображении эталонные боксы (зелёным) и предсказания движка
+  (красным) и сохраняет PNG в `ocr/_preview/` (в `.gitignore`).
+- `ocr.tools.eval_ocr` считает детекцию (precision/recall/F1, средний IoU) и распознавание (CER/WER,
   точное совпадение) на детерминированной выборке из `dataset/`.
 - Тесты с реальными движками помечены `@pytest.mark.slow` и не входят в `make check`; EasyOCR
   дополнительно требует `OCR_RUN_EASYOCR=1`, так как скачивает модели.
