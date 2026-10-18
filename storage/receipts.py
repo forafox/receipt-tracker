@@ -63,6 +63,17 @@ class ReceiptStorage(Protocol):
         """
         ...
 
+    def delete_last(self, user_id: int) -> Receipt | None:
+        """Delete the receipt the user saved most recently.
+
+        Args:
+            user_id: Telegram user identifier.
+
+        Returns:
+            Deleted receipt, or None if the user has no receipts.
+        """
+        ...
+
 
 class SqliteReceiptStorage:
     """Receipt storage backed by an SQLite file."""
@@ -144,6 +155,25 @@ class SqliteReceiptStorage:
                 (user_id, limit),
             ).fetchall()
         return [Receipt.model_validate_json(payload) for (payload,) in rows]
+
+    def delete_last(self, user_id: int) -> Receipt | None:
+        """Delete the receipt the user saved most recently.
+
+        Args:
+            user_id: Telegram user identifier.
+
+        Returns:
+            Deleted receipt, or None if the user has no receipts.
+        """
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT id, payload FROM receipts WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+                (user_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            connection.execute("DELETE FROM receipts WHERE id = ?", (row[0],))
+        return Receipt.model_validate_json(row[1])
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
