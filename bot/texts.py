@@ -44,7 +44,8 @@ class Texts:
 RU = Texts(
     start="Привет! Пришлите фото чека, и я посчитаю покупки по категориям.\nСписок команд: /help",
     help=(
-        "Отправьте фото чека, чтобы сохранить покупку.\n"
+        "Отправьте фото чека, чтобы сохранить покупку. "
+        "Если отправить его файлом, качество будет выше.\n"
         "/month — расходы за текущий месяц\n"
         "/help — эта справка"
     ),
@@ -66,7 +67,8 @@ EN = Texts(
     start="Hi! Send me a photo of a receipt and I will sort the purchases by category.\n"
     "Commands: /help",
     help=(
-        "Send a photo of a receipt to save the purchase.\n"
+        "Send a photo of a receipt to save the purchase. "
+        "Sending it as a file keeps the quality higher.\n"
         "/month — spending for the current month\n"
         "/help — this message"
     ),

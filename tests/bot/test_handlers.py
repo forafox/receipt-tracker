@@ -4,7 +4,7 @@ from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock
 from zoneinfo import ZoneInfo
 
-from bot.handlers import handle_month, handle_photo, handle_start
+from bot.handlers import handle_image_document, handle_month, handle_photo, handle_start
 from bot.texts import EN, RU
 from common.contracts import Receipt
 from pipeline import MonthlySummary, ReceiptUnreadable
@@ -49,6 +49,7 @@ def make_bot(content: bytes) -> MagicMock:
 
     bot = MagicMock()
     bot.download = AsyncMock(side_effect=download)
+    bot.send_chat_action = AsyncMock()
     return bot
 
 
@@ -98,3 +99,16 @@ async def test_photo_reports_unreadable_receipt() -> None:
     await handle_photo(message, make_bot(b"image"), FakeService(ReceiptUnreadable()), RU)
 
     message.answer.assert_awaited_once_with(RU.unreadable)
+
+
+async def test_image_document_is_processed_like_photo() -> None:
+    message = make_message()
+    message.document = MagicMock()
+    bot = make_bot(b"file")
+    service = FakeService()
+
+    await handle_image_document(message, bot, service, EN)
+
+    assert bot.download.await_args.args[0] is message.document
+    assert service.received == (42, b"file", SENT_AT)
+    message.answer.assert_awaited_once()
