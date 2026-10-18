@@ -4,7 +4,13 @@ from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock
 from zoneinfo import ZoneInfo
 
-from bot.handlers import handle_image_document, handle_month, handle_photo, handle_start
+from bot.handlers import (
+    handle_history,
+    handle_image_document,
+    handle_month,
+    handle_photo,
+    handle_start,
+)
 from bot.texts import EN, RU
 from common.contracts import Receipt
 from pipeline import MonthlySummary, ReceiptAlreadySaved, ReceiptUnreadable
@@ -28,6 +34,9 @@ class FakeService:
             raise self.error
         self.received = (user_id, photo, received_at)
         return RECEIPT
+
+    async def recent_receipts(self, user_id: int) -> list[Receipt]:
+        return [RECEIPT, Receipt()]
 
     async def monthly_summary(self, user_id: int, moment: datetime) -> MonthlySummary:
         self.received_month = (user_id, moment)
@@ -120,3 +129,15 @@ async def test_photo_reports_duplicate_receipt() -> None:
     await handle_photo(message, make_bot(b"image"), FakeService(ReceiptAlreadySaved()), RU)
 
     message.answer.assert_awaited_once_with(RU.duplicate)
+
+
+async def test_history_lists_recent_receipts() -> None:
+    message = make_message()
+
+    await handle_history(message, FakeService(), EN)
+
+    message.answer.assert_awaited_once_with(
+        "Recent receipts:\n"
+        "05.10.2026, ПЯТЁРОЧКА, 250.00\n"
+        "not recognized, not recognized, not recognized"
+    )

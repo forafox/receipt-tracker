@@ -77,3 +77,15 @@ def test_existing_database_is_migrated(tmp_path: Path) -> None:
     assert storage.save(1, FULL_RECEIPT, OCTOBER) is True
     assert storage.save(1, FULL_RECEIPT, OCTOBER) is False
     assert len(storage.list_between(1, OCTOBER, NOVEMBER)) == 2
+
+
+def test_list_recent_returns_newest_first(tmp_path: Path) -> None:
+    storage = SqliteReceiptStorage(tmp_path / "receipts.sqlite")
+    storage.save(1, Receipt(store="old"), OCTOBER)
+    storage.save(1, Receipt(store="new"), NOVEMBER)
+    storage.save(1, Receipt(store="same time, saved later"), NOVEMBER)
+    storage.save(2, Receipt(store="other user"), NOVEMBER)
+
+    receipts = storage.list_recent(1, limit=2)
+
+    assert [receipt.store for receipt in receipts] == ["same time, saved later", "new"]

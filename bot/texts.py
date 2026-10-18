@@ -17,6 +17,8 @@ class Texts:
         duplicate: Reply sent when the receipt was already saved.
         month_empty: Reply sent when no receipts were saved this month.
         month_spending: Label for the monthly spending.
+        history_empty: Reply sent when the user has no saved receipts.
+        history_title: Heading of the recent receipts list.
         receipt_count: Label for the number of receipts.
         store: Label for the store name.
         date: Label for the purchase date.
@@ -24,6 +26,7 @@ class Texts:
         not_found: Placeholder for a field that was not recognized.
         help_command: Localized help command description.
         month_command: Localized monthly report command description.
+        history_command: Localized recent receipts command description.
     """
 
     start: str
@@ -34,6 +37,8 @@ class Texts:
     duplicate: str
     month_empty: str
     month_spending: str
+    history_empty: str
+    history_title: str
     receipt_count: str
     store: str
     date: str
@@ -41,6 +46,7 @@ class Texts:
     not_found: str
     help_command: str
     month_command: str
+    history_command: str
 
 
 RU = Texts(
@@ -49,6 +55,7 @@ RU = Texts(
         "Отправьте фото чека, чтобы сохранить покупку. "
         "Если отправить его файлом, качество будет выше.\n"
         "/month — расходы за текущий месяц\n"
+        "/history — последние чеки\n"
         "/help — эта справка"
     ),
     unknown="Я понимаю только фото чеков. Список команд: /help",
@@ -57,6 +64,8 @@ RU = Texts(
     duplicate="Этот чек уже сохранён, повторно он не учитывается.",
     month_empty="В этом месяце чеков пока нет.",
     month_spending="Расходы за",
+    history_empty="Сохранённых чеков пока нет.",
+    history_title="Последние чеки:",
     receipt_count="Чеков",
     store="Магазин",
     date="Дата",
@@ -64,6 +73,7 @@ RU = Texts(
     not_found="не распознано",
     help_command="Справка",
     month_command="Расходы за месяц",
+    history_command="Последние чеки",
 )
 
 EN = Texts(
@@ -73,6 +83,7 @@ EN = Texts(
         "Send a photo of a receipt to save the purchase. "
         "Sending it as a file keeps the quality higher.\n"
         "/month — spending for the current month\n"
+        "/history — recent receipts\n"
         "/help — this message"
     ),
     unknown="I only understand receipt photos. Commands: /help",
@@ -81,6 +92,8 @@ EN = Texts(
     duplicate="This receipt is already saved and will not be counted twice.",
     month_empty="No receipts this month yet.",
     month_spending="Spending for",
+    history_empty="No saved receipts yet.",
+    history_title="Recent receipts:",
     receipt_count="Receipts",
     store="Store",
     date="Date",
@@ -88,6 +101,7 @@ EN = Texts(
     not_found="not recognized",
     help_command="Help",
     month_command="Spending this month",
+    history_command="Recent receipts",
 )
 
 TEXTS_BY_LANGUAGE = {"ru": RU, "en": EN}
@@ -141,3 +155,23 @@ def format_monthly_summary(summary: MonthlySummary, texts: Texts) -> str:
         f"{texts.month_spending} {summary.month:%m.%Y}: {summary.total:.2f}\n"
         f"{texts.receipt_count}: {summary.receipt_count}"
     )
+
+
+def format_history(receipts: list[Receipt], texts: Texts) -> str:
+    """Render recent receipts as a user-facing list.
+
+    Args:
+        receipts: Receipts ordered from the newest to the oldest.
+        texts: Localized labels.
+
+    Returns:
+        One line per receipt with its date, store and total.
+    """
+    if not receipts:
+        return texts.history_empty
+    lines = [texts.history_title]
+    for receipt in receipts:
+        date = receipt.datetime.strftime("%d.%m.%Y") if receipt.datetime else texts.not_found
+        total = f"{receipt.total:.2f}" if receipt.total is not None else texts.not_found
+        lines.append(f"{date}, {receipt.store or texts.not_found}, {total}")
+    return "\n".join(lines)

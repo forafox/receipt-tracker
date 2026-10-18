@@ -25,6 +25,7 @@ def commands(texts: Texts) -> list[BotCommand]:
     """
     return [
         BotCommand(command="month", description=texts.month_command),
+        BotCommand(command="history", description=texts.history_command),
         BotCommand(command="help", description=texts.help_command),
     ]
 

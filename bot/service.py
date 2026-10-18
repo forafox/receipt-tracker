@@ -32,3 +32,14 @@ class ReceiptService(Protocol):
             Spending summary for the month.
         """
         ...
+
+    async def recent_receipts(self, user_id: int) -> list[Receipt]:
+        """List a user's most recent receipts.
+
+        Args:
+            user_id: Telegram user identifier.
+
+        Returns:
+            Receipts ordered from the newest to the oldest.
+        """
+        ...

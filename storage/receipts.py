@@ -51,6 +51,18 @@ class ReceiptStorage(Protocol):
         """
         ...
 
+    def list_recent(self, user_id: int, limit: int) -> list[Receipt]:
+        """List a user's most recent receipts.
+
+        Args:
+            user_id: Telegram user identifier.
+            limit: Maximum number of receipts to return.
+
+        Returns:
+            Receipts ordered from the newest to the oldest.
+        """
+        ...
+
 
 class SqliteReceiptStorage:
     """Receipt storage backed by an SQLite file."""
@@ -112,6 +124,24 @@ class SqliteReceiptStorage:
                 " WHERE user_id = ? AND purchased_at >= ? AND purchased_at < ?"
                 " ORDER BY purchased_at, id",
                 (user_id, int(start.timestamp()), int(end.timestamp())),
+            ).fetchall()
+        return [Receipt.model_validate_json(payload) for (payload,) in rows]
+
+    def list_recent(self, user_id: int, limit: int) -> list[Receipt]:
+        """List a user's most recent receipts.
+
+        Args:
+            user_id: Telegram user identifier.
+            limit: Maximum number of receipts to return.
+
+        Returns:
+            Receipts ordered from the newest to the oldest.
+        """
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT payload FROM receipts WHERE user_id = ?"
+                " ORDER BY purchased_at DESC, id DESC LIMIT ?",
+                (user_id, limit),
             ).fetchall()
         return [Receipt.model_validate_json(payload) for (payload,) in rows]
 
