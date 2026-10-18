@@ -107,3 +107,13 @@ OCR_RUN_EASYOCR=1 uv run pytest -m slow
   точное совпадение) на детерминированной выборке из `dataset/`.
 - Тесты с реальными движками помечены `@pytest.mark.slow` и не входят в `make check`; EasyOCR
   дополнительно требует `OCR_RUN_EASYOCR=1`, так как скачивает модели.
+
+## Изменения в ветке `refactor/ocr-reorganize-package`
+
+- Пакет `ocr/` разделён на подпакеты: `core/`, `engines/`, `datasets/`, `tools/`.
+- Модули переименованы под контекст: `tesseract.py`, `easyocr.py`, `detection.py`, `recognition.py`.
+- Обновлены импорты в коде и тестах; публичный API `ocr/__init__.py` не изменился.
+- Исправлены пути, зависящие от расположения модулей: `DATASET_ROOT` и `PREVIEW_DIR`.
+- Новые точки входа: `python -m ocr.tools.preview`, `python -m ocr.tools.eval_ocr`,
+  `python -m ocr.datasets.viewer`.
+- `make check` проходит; slow-тест Tesseract проходит, EasyOCR требует `OCR_RUN_EASYOCR=1`.
