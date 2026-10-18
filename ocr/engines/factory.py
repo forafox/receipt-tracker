@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from common.ocr import OcrEngine
-from ocr.config import OcrSettings
+from ocr.core.config import OcrSettings
 
 
 def build_ocr_engine(settings: OcrSettings | None = None) -> OcrEngine:
@@ -18,14 +18,14 @@ def build_ocr_engine(settings: OcrSettings | None = None) -> OcrEngine:
     """
     resolved = settings if settings is not None else OcrSettings()
     if resolved.engine == "tesseract":
-        from ocr.tesseract_engine import TesseractEngine
+        from ocr.engines.tesseract import TesseractEngine
 
         return TesseractEngine(
             languages=resolved.tesseract_languages,
             min_confidence=resolved.min_confidence,
         )
     if resolved.engine == "easyocr":
-        from ocr.easyocr_engine import EasyOcrEngine
+        from ocr.engines.easyocr import EasyOcrEngine
 
         return EasyOcrEngine(
             languages=resolved.easyocr_languages,

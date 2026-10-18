@@ -6,8 +6,8 @@ import random
 import cv2
 import numpy as np
 
-from ocr.dataset_det import DetectionDataset, build_detection_dataset
-from ocr.dataset_rec import RecognitionDataset, build_recognition_dataset
+from ocr.datasets.detection import DetectionDataset, build_detection_dataset
+from ocr.datasets.recognition import RecognitionDataset, build_recognition_dataset
 
 WINDOW = "receipt-dataset-viewer"
 HEADER = 40

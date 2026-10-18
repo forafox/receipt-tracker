@@ -4,9 +4,9 @@ from collections.abc import Sequence
 from typing import Any
 
 from common.ocr import OcrResult, TextBlock
-from ocr.errors import OcrEngineUnavailableError
-from ocr.image import decode_image
-from ocr.ordering import blocks_to_text
+from ocr.core.errors import OcrEngineUnavailableError
+from ocr.core.image import decode_image
+from ocr.core.ordering import blocks_to_text
 
 
 class EasyOcrEngine:

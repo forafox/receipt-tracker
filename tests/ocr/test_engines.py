@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 
 from common.ocr import OcrEngine, OcrResult, TextBlock
-from ocr.config import OcrSettings
-from ocr.factory import build_ocr_engine
-from ocr.ordering import blocks_to_text
+from ocr.core.config import OcrSettings
+from ocr.core.ordering import blocks_to_text
+from ocr.engines.factory import build_ocr_engine
 from pipeline import TextRecognizer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

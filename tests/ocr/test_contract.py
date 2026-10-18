@@ -4,10 +4,10 @@ import pytest
 from pydantic import ValidationError
 
 from common.ocr import OcrResult, TextBlock
-from ocr.errors import ImageDecodeError
-from ocr.geometry import axis_aligned, iou
-from ocr.image import decode_image
-from ocr.ordering import blocks_to_text
+from ocr.core.errors import ImageDecodeError
+from ocr.core.geometry import axis_aligned, iou
+from ocr.core.image import decode_image
+from ocr.core.ordering import blocks_to_text
 
 
 def _block(text: str, x1: float, y1: float, x2: float, y2: float) -> TextBlock:

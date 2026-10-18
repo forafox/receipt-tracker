@@ -9,9 +9,9 @@ from typing import Any, cast
 import cv2
 import numpy as np
 
-from ocr.dataset_rec import contains_arabic
+from ocr.datasets.recognition import contains_arabic
 
-DATASET_ROOT = Path(__file__).resolve().parents[1] / "dataset"
+DATASET_ROOT = Path(__file__).resolve().parents[2] / "dataset"
 
 Box = tuple[int, int, int, int]
 _BoxN = tuple[float, float, float, float]
