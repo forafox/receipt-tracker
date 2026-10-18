@@ -5,9 +5,9 @@ from typing import Any
 import cv2
 
 from common.ocr import OcrResult, TextBlock
-from ocr.errors import OcrEngineUnavailableError
-from ocr.image import decode_image
-from ocr.ordering import blocks_to_text
+from ocr.core.errors import OcrEngineUnavailableError
+from ocr.core.image import decode_image
+from ocr.core.ordering import blocks_to_text
 
 _WORD_LEVEL = 5
 

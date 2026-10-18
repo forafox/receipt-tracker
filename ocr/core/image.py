@@ -3,7 +3,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from ocr.errors import ImageDecodeError
+from ocr.core.errors import ImageDecodeError
 
 
 def decode_image(image: bytes) -> np.ndarray:

@@ -9,7 +9,7 @@ from typing import Any, NamedTuple, cast
 import cv2
 import numpy as np
 
-DATASET_ROOT = Path(__file__).resolve().parents[1] / "dataset"
+DATASET_ROOT = Path(__file__).resolve().parents[2] / "dataset"
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
 
