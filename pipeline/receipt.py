@@ -12,6 +12,8 @@ from storage import ReceiptStorage
 
 logger = logging.getLogger(__name__)
 
+HISTORY_SIZE = 5
+
 
 class ReceiptUnreadable(Exception):
     """Raised when no useful receipt data can be extracted from a photo."""
@@ -117,3 +119,14 @@ class ReceiptPipeline:
             (receipt.total for receipt in receipts if receipt.total is not None), Decimal(0)
         )
         return MonthlySummary(month=start.date(), receipt_count=len(receipts), total=total)
+
+    async def recent_receipts(self, user_id: int) -> list[Receipt]:
+        """List a user's most recent receipts.
+
+        Args:
+            user_id: Telegram user identifier.
+
+        Returns:
+            Up to ``HISTORY_SIZE`` receipts ordered from the newest to the oldest.
+        """
+        return await asyncio.to_thread(self._storage.list_recent, user_id, HISTORY_SIZE)

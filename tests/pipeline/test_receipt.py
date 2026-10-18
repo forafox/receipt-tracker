@@ -39,6 +39,10 @@ class FakeStorage:
             if owner == user_id and start <= purchased_at < end
         ]
 
+    def list_recent(self, user_id: int, limit: int) -> list[Receipt]:
+        receipts = [receipt for owner, receipt, _ in self.saved if owner == user_id]
+        return receipts[::-1][:limit]
+
 
 def make_pipeline(text: str, storage: FakeStorage | None = None) -> ReceiptPipeline:
     return ReceiptPipeline(FakeRecognizer(text), storage or FakeStorage(), MOSCOW_TIMEZONE)
@@ -147,3 +151,13 @@ async def test_same_receipt_is_rejected_on_second_upload() -> None:
         await pipeline.process_photo(1, b"image", RECEIVED_AT)
 
     assert len(storage.saved) == 1
+
+
+async def test_recent_receipts_are_limited_to_history_size() -> None:
+    storage = FakeStorage()
+    for number in range(7):
+        storage.save(1, Receipt(store=f"store {number}"), RECEIVED_AT)
+
+    receipts = await make_pipeline("", storage).recent_receipts(1)
+
+    assert [receipt.store for receipt in receipts] == [f"store {n}" for n in range(6, 1, -1)]

@@ -7,7 +7,7 @@ from aiogram.types import Downloadable, Message
 from aiogram.utils.chat_action import ChatActionSender
 
 from bot.service import ReceiptService
-from bot.texts import Texts, format_monthly_summary, format_receipt
+from bot.texts import Texts, format_history, format_monthly_summary, format_receipt
 from pipeline import ReceiptAlreadySaved, ReceiptUnreadable
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,21 @@ async def handle_month(message: Message, service: ReceiptService, texts: Texts) 
         return
     summary = await service.monthly_summary(message.from_user.id, message.date)
     await message.answer(format_monthly_summary(summary, texts))
+
+
+@router.message(Command("history"))
+async def handle_history(message: Message, service: ReceiptService, texts: Texts) -> None:
+    """Send the current user's most recent receipts.
+
+    Args:
+        message: Incoming Telegram history-command message.
+        service: Receipt service that lists saved receipts.
+        texts: Localized response texts.
+    """
+    if message.from_user is None:
+        return
+    receipts = await service.recent_receipts(message.from_user.id)
+    await message.answer(format_history(receipts, texts))
 
 
 @router.message(F.photo)
