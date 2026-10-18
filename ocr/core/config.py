@@ -11,6 +11,7 @@ class OcrSettings(BaseSettings):
         easyocr_languages: EasyOCR language codes passed to the reader.
         min_confidence: Minimum block confidence in the ``0..1`` range to keep a block.
         gpu: Whether EasyOCR should use the GPU.
+        tesseract_config: Extra Tesseract configuration flags.
     """
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="OCR_")
@@ -20,3 +21,4 @@ class OcrSettings(BaseSettings):
     easyocr_languages: list[str] = Field(default_factory=lambda: ["ru", "en"])
     min_confidence: float = Field(default=0.0, ge=0, le=1)
     gpu: bool = False
+    tesseract_config: str = ""
