@@ -7,6 +7,7 @@ from typing import Protocol
 
 from common.contracts import Receipt
 from extract import parse_receipt
+from ocr import ImageDecodeError
 from storage import ReceiptStorage
 
 logger = logging.getLogger(__name__)
@@ -29,21 +30,6 @@ class TextRecognizer(Protocol):
             Recognized text with one receipt line per text line.
         """
         ...
-
-
-class NullRecognizer:
-    """Recognizer used until an OCR engine is connected."""
-
-    def recognize(self, image: bytes) -> str:
-        """Recognize nothing.
-
-        Args:
-            image: Raw receipt image bytes.
-
-        Returns:
-            Empty text.
-        """
-        return ""
 
 
 @dataclass(frozen=True)
@@ -90,9 +76,13 @@ class ReceiptPipeline:
             Parsed receipt.
 
         Raises:
-            ReceiptUnreadable: If neither the date nor the total was found.
+            ReceiptUnreadable: If the image cannot be decoded or neither the date nor the total
+                was found.
         """
-        text = await asyncio.to_thread(self._recognizer.recognize, photo)
+        try:
+            text = await asyncio.to_thread(self._recognizer.recognize, photo)
+        except ImageDecodeError as error:
+            raise ReceiptUnreadable from error
         receipt = parse_receipt(text, timezone=self._timezone)
         if receipt.datetime is None and receipt.total is None:
             raise ReceiptUnreadable
