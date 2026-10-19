@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import random
 from collections import Counter, defaultdict
 from collections.abc import Iterable
@@ -20,9 +21,34 @@ from categorize.dataset import load_training_examples
 from categorize.schemas import TrainingExample
 from categorize.transformer import TransformerCategoryClassifier
 
+# Compatibility shim: transformers 4.39 passes arguments such as
+# ``dispatch_batches``/``even_batches`` to ``accelerate.Accelerator``; newer
+# accelerate releases moved them into ``DataLoaderConfiguration``. Dropping the
+# unsupported keywords keeps Trainer usable on that version pair.
+try:  # pragma: no cover - trivial import guard
+    from accelerate import Accelerator as _Accelerator
+
+    _accelerator_init = _Accelerator.__init__
+    _accelerator_params = inspect.signature(_accelerator_init).parameters
+    _accelerator_accepts_kwargs = "kwargs" in _accelerator_params
+
+    def _accelerator_init_without_unsupported(
+        self: object, *args: object, **kwargs: object
+    ) -> None:
+        if not _accelerator_accepts_kwargs:
+            for key in list(kwargs):
+                if key not in _accelerator_params:
+                    kwargs.pop(key)
+        _accelerator_init(self, *args, **kwargs)
+
+    _Accelerator.__init__ = _accelerator_init_without_unsupported  # type: ignore[method-assign]
+except ImportError:  # pragma: no cover - accelerate is a transformers dependency
+    pass
+
 DEFAULT_BASE_MODEL = "cointegrated/rubert-tiny"
 DEFAULT_MAX_LENGTH = 64
 DEFAULT_THRESHOLD = 0.5
+MAX_OVERSAMPLE_TARGET = 5000
 
 
 def train_transformer(
@@ -63,7 +89,7 @@ def train_transformer(
     )
     args = TrainingArguments(
         output_dir=str(output_dir),
-        eval_strategy="epoch",
+        evaluation_strategy="epoch",
         save_strategy="no",
         learning_rate=5e-5,
         per_device_train_batch_size=8,
@@ -80,7 +106,7 @@ def train_transformer(
         args=args,
         train_dataset=tokenized_train,
         eval_dataset=tokenized_eval,
-        processing_class=tokenizer,
+        tokenizer=tokenizer,
         data_collator=DataCollatorWithPadding(tokenizer=tokenizer),
         compute_metrics=_compute_metrics,
     )
@@ -102,7 +128,7 @@ def _build_dataset(examples: list[TrainingExample], label_to_id: dict[str, int])
 def _oversample_training_dataset(dataset: Dataset) -> Dataset:
     labels = [_primary_label(label_vector) for label_vector in dataset["labels"]]
     counts = Counter(labels)
-    target_count = max(counts.values())
+    target_count = min(max(counts.values()), MAX_OVERSAMPLE_TARGET)
     indices_by_label: defaultdict[int, list[int]] = defaultdict(list)
     for index, label in enumerate(labels):
         indices_by_label[label].append(index)

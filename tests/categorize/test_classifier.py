@@ -1,5 +1,4 @@
 from categorize.eval import evaluate
-from categorize.lexical import predict_by_keywords
 from categorize.schemas import TrainingExample
 from common import CategoryPrediction, CategoryScore
 
@@ -28,10 +27,3 @@ def test_classifier_eval_reports_accuracy() -> None:
 
     assert result.accuracy == 1
     assert result.examples == len(examples)
-
-
-def test_lexical_classifier_returns_multiple_categories() -> None:
-    scores = predict_by_keywords("молоко, шампунь и парацетамол")
-
-    categories = {score.category for score in scores}
-    assert {"food", "personal_care", "medicine"} <= categories

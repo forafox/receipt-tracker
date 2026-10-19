@@ -31,5 +31,8 @@ htmlcov/
 # Data (root OCR downloads)
 dataset/
 
+# Local HF download, never commit
+categorize/data/ru-product-taxonomy/
+
 # OCR preview output
 ocr/_preview/
