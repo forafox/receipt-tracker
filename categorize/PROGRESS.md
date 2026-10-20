@@ -20,7 +20,7 @@
 | FastAPI `/classify/items` POST → {items: [Item]} → {items: [ClassifiedItem]} | endpoint exists | :white_check_mark: | |
 | FastAPI `/classify/receipt` POST → Receipt (M2→M3) → ClassifiedReceipt | endpoint exists | :white_check_mark: | |
 | FastAPI `/train` POST → {dataset_path, model_path} → 204, reload service | endpoint exists, returns 204 | :white_check_mark: | |
-| F1 on test split > 0.85 (macro/weighted) | To be determined after training on full dataset | :arrows_counter_clockwise: | TBD |
+| F1 on test split > 0.85 (macro/weighted) | Balanced holdout: micro_f1 0.9285, exact_match 0.9275 (`training_wb.csv`) | :white_check_mark: | Per-class: food 0.908, household 0.958, personal_care 0.925, medicine 0.921, cafe 0.880 |
 | Data: CSV `text,category` UTF-8 with header | `dataset.py` `load_training_examples` reads CSV, skips empty rows | :white_check_mark: | |
 | Data: seed 104 rows + HF up to max_per_category=30 | `external_dataset.py` `build_training_csv` implements seed + filtered HF rows | :white_check_mark: | |
 | Single GPU per launch discipline | Code structure supports GPU discipline; runtime enforcement via `CUDA_VISIBLE_DEVICES` | :warning: | PDF doesn't specify, harness requires it |
@@ -45,43 +45,55 @@
 ## Current State — What Is Ready
 
 ### Dataset
-- `categorize/data/training_full.csv` — **5080 rows** built from the Russian slice of
-  `IvanTatarkin/ru-product-taxonomy` + `items.csv` seed:
-  `food` 5000, `cafe` 20, `household` 20, `medicine` 20, `personal_care` 20.
-- Build command: `python -m categorize build-dataset --output categorize/data/training_full.csv`
-  (`--limit` default 5000, `--max-per-category` default 5000).
-- `categorize/data/training.csv` — small 110-row dataset used for smoke tests.
+- `categorize/data/training_wb.csv` — **24 127 строк**, основной датасет:
+  `food` 6000, `household` 6000, `personal_care` 6000, `medicine` 6000, `cafe` 127.
+  - Источники: `nyuuzyou/wb-products` (Wildberries, CC0) — разметка по
+    `subj_root_name`; русский срез Open Food Facts (4 430 названий) — для
+    свежих продуктов, которых нет на WB.
+  - `cafe` — единственная категория без публичного русского датасета, список
+    готовых блюд/напитков собран вручную.
+  - Сборка выполнялась офлайн на GPU-сервере из сырых `.zst` (в репозиторий не
+    входят); в git лежит только готовый CSV.
+- `categorize/data/training_full.csv` — старый 5080-строчный датасет. **Не использовать**:
+  `IvanTatarkin/ru-product-taxonomy` на 99 % состоит из Open Food Facts, и
+  «русские» строки на деле французские (`Pain de mie`, `Andouille`).
+- `categorize/data/training.csv` — 110 строк для smoke-тестов.
 
 ### Training
-- `categorize/training.py` runs end-to-end on the installed stack
-  (`transformers 4.39.3` + `accelerate 1.8.1`).
-- Compatibility fixes applied:
-  - `evaluation_strategy` (instead of `eval_strategy`);
-  - `tokenizer=` (instead of `processing_class=`);
-  - a small shim that drops Accelerator kwargs unsupported by the installed
-    `accelerate` (`dispatch_batches`, `even_batches`, ...), filtered by signature.
-- `--epochs` CLI flag added (default 6.0, PDF-compatible).
-- Oversampling is capped by `MAX_OVERSAMPLE_TARGET = 5000` to avoid huge
-  minority-class blow-up while keeping the majority class intact.
-- Verified: `python -m categorize train --dataset categorize/data/training.csv
-  --model categorize/models/_smoke --epochs 1` finishes and writes a loadable model
-  (`eval_exact_match≈0.227`, `eval_micro_f1≈0.227` on the 110-row smoke dataset).
+- Модель `categorize/models/category_transformer` обучена на `training_wb.csv`:
+  15 эпох, GPU (RTX 6000), `train_runtime ≈ 1121 c`, `train_loss ≈ 0.031`.
+- Сбалансированный holdout (20 %, 4 825 строк) — честные метрики:
+
+| Категория | exact_match | micro_f1 | n |
+|---|---|---|---|
+| food | 0.9075 | 0.9081 | 1200 |
+| household | 0.9575 | 0.9588 | 1200 |
+| personal_care | 0.9250 | 0.9263 | 1200 |
+| medicine | 0.9208 | 0.9213 | 1200 |
+| cafe | 0.8800 | 0.9020 | 25 |
+| **итого** | **0.9275** | **0.9285** | **4825** |
+
+- `categorize/training.py` совместим с `transformers` 4.39 и 4.57:
+  `eval_strategy`/`evaluation_strategy` и `processing_class`/`tokenizer`
+  выбираются по сигнатуре установленной версии.
+- Oversampling train-фолда ограничен `MAX_OVERSAMPLE_TARGET = 5000`.
+- `--epochs` CLI flag (по умолчанию 6.0).
 
 ### CLI
 | Command | Purpose |
 |---|---|
-| `python -m categorize build-dataset` | Build full training CSV (HF + seed) |
-| `python -m categorize train --dataset ... --model ... --epochs N` | Train transformer |
-| `python -m categorize eval --dataset ... --model ...` | Exact-match evaluation |
+| `python -m categorize build-dataset` | Собрать CSV из старого HF + seed (legacy) |
+| `python -m categorize train --dataset ... --model ... --epochs N` | Обучение трансформера |
+| `python -m categorize eval --dataset ... --model ...` | Exact-match + micro-F1 |
 
 ### Known Limitations
-- The HF Russian slice is grocery-only, so `food` dominates (~98% of rows);
-  non-food categories come from the 104-row seed. Full-dataset accuracy will be
-  biased toward `food` unless more non-food data is added.
-- Full 5080-row training has not been run to completion yet (only the smoke run).
-  Runtime on CPU is significant because oversampling brings the train split to ~20k rows.
-- `uv run python` is unreliable in this environment (imports time out / OOM);
-  `/usr/bin/python3` is used instead (it has older `transformers`).
+- `cafe` размечен вручную (127 строк), поэтому метрика по нему шумная (n=25 в holdout).
+- WB — маркетплейс, а не OCR чеков: названия длиннее и «чище», чем в реальном чеке.
+- Основная путаница модели: `food` → `medicine` (75 из 1200) и `medicine` ↔
+  `personal_care` (36/28) — БАДы и лечебная косметика пересекаются.
+- `IvanTatarkin/ru-product-taxonomy` для обучения больше не используется.
+- `uv run python` в этом окружении нестабилен (таймауты/OOM); используется
+  `/usr/bin/python3`.
 
 
 ## Code Health

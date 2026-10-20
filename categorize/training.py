@@ -5,6 +5,7 @@ import random
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from datasets import Dataset
@@ -49,6 +50,8 @@ DEFAULT_BASE_MODEL = "cointegrated/rubert-tiny"
 DEFAULT_MAX_LENGTH = 64
 DEFAULT_THRESHOLD = 0.5
 MAX_OVERSAMPLE_TARGET = 5000
+_TRAINER_PARAMS = inspect.signature(Trainer.__init__).parameters
+_TRAINING_ARGUMENT_PARAMS = inspect.signature(TrainingArguments.__init__).parameters
 
 
 def train_transformer(
@@ -87,33 +90,50 @@ def train_transformer(
         label2id=label_to_id,
         problem_type="multi_label_classification",
     )
-    args = TrainingArguments(
-        output_dir=str(output_dir),
-        evaluation_strategy="epoch",
-        save_strategy="no",
-        learning_rate=5e-5,
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
-        num_train_epochs=epochs,
-        weight_decay=0.01,
-        load_best_model_at_end=False,
-        logging_steps=5,
-        report_to=[],
-        seed=42,
-    )
-    trainer = Trainer(
-        model=model,
-        args=args,
-        train_dataset=tokenized_train,
-        eval_dataset=tokenized_eval,
-        tokenizer=tokenizer,
-        data_collator=DataCollatorWithPadding(tokenizer=tokenizer),
-        compute_metrics=_compute_metrics,
-    )
+    args = _build_training_arguments(output_dir, epochs)
+    trainer_kwargs: dict[str, Any] = {
+        "model": model,
+        "args": args,
+        "train_dataset": tokenized_train,
+        "eval_dataset": tokenized_eval,
+        "data_collator": DataCollatorWithPadding(tokenizer=tokenizer),
+        "compute_metrics": _compute_metrics,
+    }
+    if "processing_class" in _TRAINER_PARAMS:
+        trainer_kwargs["processing_class"] = tokenizer
+    else:
+        trainer_kwargs["tokenizer"] = tokenizer
+    trainer = Trainer(**trainer_kwargs)
     trainer.train()
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(output_dir)
     TransformerCategoryClassifier.save_metadata(output_dir, id_to_label, max_length)
+
+
+def _build_training_arguments(output_dir: Path, epochs: float) -> TrainingArguments:
+    """Build ``TrainingArguments`` across transformers versions.
+
+    ``evaluation_strategy`` was renamed to ``eval_strategy`` in transformers
+    4.41, so the argument name is chosen by inspecting the installed version.
+    """
+    kwargs: dict[str, Any] = {
+        "output_dir": str(output_dir),
+        "save_strategy": "no",
+        "learning_rate": 5e-5,
+        "per_device_train_batch_size": 8,
+        "per_device_eval_batch_size": 8,
+        "num_train_epochs": epochs,
+        "weight_decay": 0.01,
+        "load_best_model_at_end": False,
+        "logging_steps": 5,
+        "report_to": [],
+        "seed": 42,
+    }
+    if "eval_strategy" in _TRAINING_ARGUMENT_PARAMS:
+        kwargs["eval_strategy"] = "epoch"
+    else:
+        kwargs["evaluation_strategy"] = "epoch"
+    return TrainingArguments(**kwargs)
 
 
 def _build_dataset(examples: list[TrainingExample], label_to_id: dict[str, int]) -> Dataset:

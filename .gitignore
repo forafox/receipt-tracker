@@ -33,6 +33,10 @@ dataset/
 
 # Local HF download, never commit
 categorize/data/ru-product-taxonomy/
+categorize/data/raw/
+
+# Scratch model checkpoints
+categorize/models/category_transformer_*/
 
 # OCR preview output
 ocr/_preview/

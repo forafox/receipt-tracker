@@ -55,29 +55,52 @@ text,category
 капучино,cafe
 ```
 
-Балансировка `build-dataset`: seed + строки из `IvanTatarkin/ru-product-taxonomy`
-(только `lang_hint == "ru"`, маппинг через `RECEIPT_CATEGORY_MAP`), не более
-`max_per_category=30` на категорию.
+Основной датасет — `data/training_wb.csv` (24 127 строк): реальные русские
+названия товаров из Wildberries (`nyuuzyou/wb-products`, CC0) и русский срез
+Open Food Facts (4 430 строк). Разметка по `subj_root_name` / категориям OFF:
+
+| Категория | Строк |
+| --------- | ----- |
+| `food` | 6 000 |
+| `household` | 6 000 |
+| `personal_care` | 6 000 |
+| `medicine` | 6 000 |
+| `cafe` | 127 |
+
+`cafe` (готовые блюда и напитки) — единственная категория без публичного русского
+датасета, список собран вручную. `build-dataset` (seed + `IvanTatarkin/ru-product-taxonomy`)
+оставлен для совместимости; этот HF-датасет на 99 % состоит из нерусских
+(французских) названий, поэтому для обучения не используется.
 
 ## Обучение
 
 База — `cointegrated/rubert-tiny`, `problem_type="multi_label_classification"`:
 
-- `epochs=6.0`, `lr=5e-5`, `batch=8`, `weight_decay=0.01`, `seed=42`;
+- `epochs=15` (на GPU), `lr=5e-5`, `batch=8`, `weight_decay=0.01`, `seed=42`;
 - стратифицированный сплит 80/20 (минимум 1 пример класса в валидации);
 - oversampling только train-фолда до мажоритарного класса;
 - метрики валидации: `exact_match` + `micro_f1`.
+
+Метрики на сбалансированном holdout (`data/training_wb.csv`, 4 825 строк):
+
+| Категория | exact_match |
+| --------- | ----------- |
+| `food` | 0.9075 |
+| `household` | 0.9575 |
+| `personal_care` | 0.9250 |
+| `medicine` | 0.9208 |
+| `cafe` | 0.8800 (n=25) |
+| **итого** | **0.9275** (micro_f1 0.9285) |
 
 ```bash
 # из корня репозитория:
 uv run python -m categorize build-dataset --limit 300
 uv run python -m categorize train \
-  --dataset categorize/data/training.csv \
-  --model categorize/models/category_transformer
+  --dataset categorize/data/training_wb.csv \
+  --model categorize/models/category_transformer --epochs 15
 uv run python -m categorize eval \
-  --dataset categorize/data/training.csv \
+  --dataset categorize/data/training_wb.csv \
   --model categorize/models/category_transformer
-# вывод: accuracy=0.782 examples=110
 ```
 
 Если файла модели нет, `eval` и `load_service` обучат её автоматически.
