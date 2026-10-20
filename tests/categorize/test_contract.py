@@ -15,7 +15,7 @@ CATEGORIZE_DIR = Path(__file__).resolve().parents[2] / "categorize"
 class TestPDFContractStructural:
     """Structural tests verifying the code matches PDF contract."""
 
-    def test_classifier_protocol_has_predict_method(self):
+    def test_classifier_protocol_has_predict_method(self) -> None:
         """PDF: CategoryClassifier Protocol must have predict(item_name) method.
 
         Verifies the protocol exists and has the correct signature.
@@ -33,7 +33,7 @@ class TestPDFContractStructural:
         name_related = [p for p in params if "name" in p.lower() or "item" in p.lower()]
         assert len(name_related) > 0, "predict method must have an item_name parameter"
 
-    def test_transformer_predict_has_sigmoid_and_threshold(self):
+    def test_transformer_predict_has_sigmoid_and_threshold(self) -> None:
         """PDF: TransformerCategoryClassifier.predict must use sigmoid + 0.5 threshold.
 
         PDF behavior:
@@ -67,7 +67,7 @@ class TestPDFContractStructural:
         has_sort = "sort" in src.lower()
         assert has_sort, "predict must sort categories by confidence descending"
 
-    def test_schemas_have_min_length_constraints(self):
+    def test_schemas_have_min_length_constraints(self) -> None:
         """PDF: TrainingExample and CategoryScore must have min_length=1 constraints.
 
         PDF requires text and category to have minimum length of 1.
@@ -81,7 +81,7 @@ class TestPDFContractStructural:
         )
         assert "min_length=1" in content, "Schema fields must use min_length=1 (PDF requirement)"
 
-    def test_empty_item_name_raises_valueerror(self):
+    def test_empty_item_name_raises_valueerror(self) -> None:
         """PDF: Empty/whitespace item name → ValueError.
 
         PDF explicitly states that empty string item name raises ValueError.
@@ -95,7 +95,7 @@ class TestPDFContractStructural:
         assert has_empty_check, "transformer.py must check for empty/whitespace item name"
         assert has_valueerror, "transformer.py must raise ValueError for empty item name"
 
-    def test_training_function_has_pdf_params(self):
+    def test_training_function_has_pdf_params(self) -> None:
         """PDF training params: epochs=6.0, lr=5e-5, batch=8, weight_decay=0.01, seed=42."""
         with open(CATEGORIZE_DIR / "training.py") as f:
             content = f.read()
@@ -118,7 +118,7 @@ class TestPDFContractStructural:
         assert has_weight_decay, "training.py must reference weight_decay (PDF requirement: 0.01)"
         assert has_seed_42, "training.py must use seed=42 (PDF requirement)"
 
-    def test_eval_has_exact_match_and_f1(self):
+    def test_eval_has_exact_match_and_f1(self) -> None:
         """PDF: evaluation must compute exact_match + micro_f1 metrics."""
         with open(CATEGORIZE_DIR / "eval.py") as f:
             content = f.read()
@@ -131,7 +131,7 @@ class TestPDFContractStructural:
         assert has_exact_match, "eval.py must compute exact_match metric (PDF requirement)"
         assert has_f1, "eval.py must compute F1 metric (PDF requirement)"
 
-    def test_api_has_required_endpoints(self):
+    def test_api_has_required_endpoints(self) -> None:
         """PDF: FastAPI app must have /classify, /classify/items, /classify/receipt, /train."""
         with open(CATEGORIZE_DIR / "api.py") as f:
             content = f.read()
@@ -147,7 +147,7 @@ class TestPDFContractStructural:
         assert has_classify_receipt, "api.py must have /classify/receipt endpoint (PDF requirement)"
         assert has_train, "api.py must have /train endpoint (PDF requirement)"
 
-    def test_receipt_category_map_exists(self):
+    def test_receipt_category_map_exists(self) -> None:
         """PDF: RECEIPT_CATEGORY_MAP maps HF labels to receipt categories."""
         with open(CATEGORIZE_DIR / "external_dataset.py") as f:
             content = f.read()
@@ -165,7 +165,7 @@ class TestPDFContractStructural:
             "RECEIPT_CATEGORY_MAP must contain category mappings"
         )
 
-    def test_dataset_reads_csv_format(self):
+    def test_dataset_reads_csv_format(self) -> None:
         """PDF: load_training_examples reads CSV text,category format."""
         with open(CATEGORIZE_DIR / "dataset.py") as f:
             content = f.read()
@@ -184,7 +184,7 @@ class TestPDFContractStructural:
             "load_training_examples must read text and category from CSV"
         )
 
-    def test_training_example_schema_structure(self):
+    def test_training_example_schema_structure(self) -> None:
         """PDF: TrainingExample(text, category) with both min_length=1."""
         with open(CATEGORIZE_DIR / "schemas.py") as f:
             content = f.read()
@@ -204,7 +204,7 @@ class TestPDFContractStructural:
 class TestPDFContractBehavior:
     """Tests verifying documented behavior patterns match PDF."""
 
-    def test_training_example_whitespace_handling(self):
+    def test_training_example_whitespace_handling(self) -> None:
         """PDF: Empty or whitespace-only text/category should fail validation."""
         # We verify the pattern exists in the code, execution depends on pydantic
         with open(CATEGORIZE_DIR / "schemas.py") as f:
@@ -212,7 +212,7 @@ class TestPDFContractBehavior:
 
         assert "min_length=1" in content, "Schema must enforce min_length=1 for text and category"
 
-    def test_transformer_empty_name_check_pattern(self):
+    def test_transformer_empty_name_check_pattern(self) -> None:
         """PDF: predict() must check for empty/whitespace item name and raise ValueError."""
         with open(CATEGORIZE_DIR / "transformer.py") as f:
             content = f.read()
@@ -223,7 +223,7 @@ class TestPDFContractBehavior:
         )
         assert "ValueError" in content, "predict must raise ValueError for empty item name"
 
-    def test_eval_result_schema(self):
+    def test_eval_result_schema(self) -> None:
         """PDF: EvalResult(BaseModel) with accuracy (0-1) and examples (int)."""
         with open(CATEGORIZE_DIR / "eval.py") as f:
             content = f.read()
@@ -239,7 +239,7 @@ class TestPDFContractBehavior:
         assert has_accuracy, "EvalResult must have accuracy field constrained to [0, 1]"
         assert has_examples, "EvalResult must have examples field"
 
-    def test_category_score_schema(self):
+    def test_category_score_schema(self) -> None:
         """PDF: CategoryScore(category, confidence) with category str, confidence float [0,1]."""
         with open(CATEGORIZE_DIR / "schemas.py") as f:
             content = f.read()
@@ -255,7 +255,7 @@ class TestPDFContractBehavior:
         assert has_category, "CategoryScore must have category field (str)"
         assert has_confidence, "CategoryScore must have confidence field (float, 0-1)"
 
-    def test_service_classify_item_signature(self):
+    def test_service_classify_item_signature(self) -> None:
         """PDF: CategoryService.classify_item(Item) -> ClassifiedItem."""
         with open(CATEGORIZE_DIR / "service.py") as f:
             content = f.read()
@@ -268,7 +268,7 @@ class TestPDFContractBehavior:
         assert has_classify_item, "service.py must have classify_item method"
         assert has_item_param, "classify_item must take an item parameter"
 
-    def test_service_classify_receipt_signature(self):
+    def test_service_classify_receipt_signature(self) -> None:
         """PDF: CategoryService.classify_receipt(Receipt) -> ClassifiedReceipt."""
         with open(CATEGORIZE_DIR / "service.py") as f:
             content = f.read()

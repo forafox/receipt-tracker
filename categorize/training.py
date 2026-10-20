@@ -42,7 +42,7 @@ try:  # pragma: no cover - trivial import guard
                     kwargs.pop(key)
         _accelerator_init(self, *args, **kwargs)
 
-    _Accelerator.__init__ = _accelerator_init_without_unsupported  # type: ignore[method-assign]
+    _Accelerator.__init__ = _accelerator_init_without_unsupported
 except ImportError:  # pragma: no cover - accelerate is a transformers dependency
     pass
 

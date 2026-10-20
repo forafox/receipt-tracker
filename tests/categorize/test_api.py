@@ -12,7 +12,7 @@ CATEGORIZE_DIR = Path(__file__).resolve().parents[2] / "categorize"
 class TestAPIEndpointsStructural:
     """Test that FastAPI app has the required endpoints per PDF."""
 
-    def test_app_has_classify_endpoint(self):
+    def test_app_has_classify_endpoint(self) -> None:
         """PDF: POST /classify with Item body → ClassifiedItem response."""
         from categorize.api import app
 
@@ -20,7 +20,7 @@ class TestAPIEndpointsStructural:
         route_paths = [r.path for r in app.routes if hasattr(r, "path")]
         assert "/classify" in route_paths, "FastAPI app must have /classify route (PDF requirement)"
 
-    def test_app_has_classify_items_endpoint(self):
+    def test_app_has_classify_items_endpoint(self) -> None:
         """PDF: POST /classify/items with {items: [Item]} → {items: [ClassifiedItem]}."""
         from categorize.api import app
 
@@ -29,7 +29,7 @@ class TestAPIEndpointsStructural:
             "FastAPI app must have /classify/items route (PDF requirement)"
         )
 
-    def test_app_has_classify_receipt_endpoint(self):
+    def test_app_has_classify_receipt_endpoint(self) -> None:
         """PDF: POST /classify/receipt with Receipt (M2→M3) → ClassifiedReceipt."""
         from categorize.api import app
 
@@ -38,14 +38,14 @@ class TestAPIEndpointsStructural:
             "FastAPI app must have /classify/receipt route (PDF requirement)"
         )
 
-    def test_app_has_train_endpoint(self):
+    def test_app_has_train_endpoint(self) -> None:
         """PDF: POST /train → 204, service reloads."""
         from categorize.api import app
 
         route_paths = [r.path for r in app.routes if hasattr(r, "path")]
         assert "/train" in route_paths, "FastAPI app must have /train route (PDF requirement)"
 
-    def test_app_has_correct_methods(self):
+    def test_app_has_correct_methods(self) -> None:
         """PDF: Verify endpoints use POST method where specified."""
         from categorize.api import app
 
@@ -57,7 +57,7 @@ class TestAPIEndpointsStructural:
             "All PDF-specified endpoints must be registered"
         )
 
-    def test_api_imports_structure(self):
+    def test_api_imports_structure(self) -> None:
         """PDF: api.py must define the FastAPI app and required functions."""
         with open(CATEGORIZE_DIR / "api.py") as f:
             content = f.read()
@@ -80,7 +80,7 @@ class TestAPIEndpointsStructural:
 class TestAPIBehaviorPatterns:
     """Test documented behavior patterns in the API code."""
 
-    def test_api_empty_name_handling(self):
+    def test_api_empty_name_handling(self) -> None:
         """PDF: Empty string item name → ValueError."""
         with open(CATEGORIZE_DIR / "transformer.py") as f:
             tcontent = f.read()
@@ -98,7 +98,7 @@ class TestAPIBehaviorPatterns:
             "api.py must expose load_service to surface transformer errors as HTTP errors"
         )
 
-    def test_training_auto_retrain(self):
+    def test_training_auto_retrain(self) -> None:
         """PDF: If model file doesn't exist, eval and load_service train it automatically."""
         with open(CATEGORIZE_DIR / "api.py") as f:
             content = f.read()
@@ -109,7 +109,7 @@ class TestAPIBehaviorPatterns:
             "load_service must auto-train model if it doesn't exist (PDF requirement)"
         )
 
-    def test_training_metrics(self):
+    def test_training_metrics(self) -> None:
         """PDF: Training must compute exact_match + micro_f1."""
         with open(CATEGORIZE_DIR / "training.py") as f:
             content = f.read()
