@@ -10,6 +10,7 @@ PDF requirements:
 - Empty string → ValueError
 - Returns CategoryPrediction with CategoryScore list
 """
+
 from __future__ import annotations
 
 import json
@@ -19,7 +20,7 @@ from typing import Any
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from common.models import CategoryScore, CategoryPrediction
+from common.models import CategoryPrediction, CategoryScore
 
 
 class TransformerCategoryClassifier:
@@ -32,7 +33,7 @@ class TransformerCategoryClassifier:
     - Threshold: 0.5 on sigmoid probabilities
     - Empty item name raises ValueError
     """
-    
+
     def __init__(
         self,
         model: Any,
@@ -49,7 +50,7 @@ class TransformerCategoryClassifier:
     @classmethod
     def load(cls, path: Path) -> TransformerCategoryClassifier:
         """Load classifier from a saved model directory.
-        
+
         Expected directory structure:
         - category_metadata.json (with id_to_label and max_length)
         - tokenizer/ and model/ from transformers save_pretrained

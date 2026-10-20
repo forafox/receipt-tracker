@@ -3,7 +3,10 @@
 Verifies the HTTP endpoint structure matches architecture.pdf specification.
 Tests code patterns and endpoint registration without requiring full ML imports.
 """
-import pytest
+
+from pathlib import Path
+
+CATEGORIZE_DIR = Path(__file__).resolve().parents[2] / "categorize"
 
 
 class TestAPIEndpointsStructural:
@@ -14,16 +17,14 @@ class TestAPIEndpointsStructural:
         from categorize.api import app
 
         # Verify the FastAPI app has the /classify route registered
-        route_paths = [r.path for r in app.routes if hasattr(r, 'path')]
-        assert "/classify" in route_paths, (
-            "FastAPI app must have /classify route (PDF requirement)"
-        )
+        route_paths = [r.path for r in app.routes if hasattr(r, "path")]
+        assert "/classify" in route_paths, "FastAPI app must have /classify route (PDF requirement)"
 
     def test_app_has_classify_items_endpoint(self):
         """PDF: POST /classify/items with {items: [Item]} → {items: [ClassifiedItem]}."""
         from categorize.api import app
 
-        route_paths = [r.path for r in app.routes if hasattr(r, 'path')]
+        route_paths = [r.path for r in app.routes if hasattr(r, "path")]
         assert "/classify/items" in route_paths, (
             "FastAPI app must have /classify/items route (PDF requirement)"
         )
@@ -32,7 +33,7 @@ class TestAPIEndpointsStructural:
         """PDF: POST /classify/receipt with Receipt (M2→M3) → ClassifiedReceipt."""
         from categorize.api import app
 
-        route_paths = [r.path for r in app.routes if hasattr(r, 'path')]
+        route_paths = [r.path for r in app.routes if hasattr(r, "path")]
         assert "/classify/receipt" in route_paths, (
             "FastAPI app must have /classify/receipt route (PDF requirement)"
         )
@@ -41,17 +42,15 @@ class TestAPIEndpointsStructural:
         """PDF: POST /train → 204, service reloads."""
         from categorize.api import app
 
-        route_paths = [r.path for r in app.routes if hasattr(r, 'path')]
-        assert "/train" in route_paths, (
-            "FastAPI app must have /train route (PDF requirement)"
-        )
+        route_paths = [r.path for r in app.routes if hasattr(r, "path")]
+        assert "/train" in route_paths, "FastAPI app must have /train route (PDF requirement)"
 
     def test_app_has_correct_methods(self):
         """PDF: Verify endpoints use POST method where specified."""
         from categorize.api import app
 
         # Check that the required paths exist
-        route_paths = {r.path for r in app.routes if hasattr(r, 'path')}
+        route_paths = {r.path for r in app.routes if hasattr(r, "path")}
         required = {"/classify", "/classify/items", "/classify/receipt", "/train"}
         # At minimum, these paths must be registered
         assert required.issubset(route_paths) or True, (
@@ -60,7 +59,7 @@ class TestAPIEndpointsStructural:
 
     def test_api_imports_structure(self):
         """PDF: api.py must define the FastAPI app and required functions."""
-        with open("/mnt/c/Users/kacha/receipt-tracker/categorize/api.py") as f:
+        with open(CATEGORIZE_DIR / "api.py") as f:
             content = f.read()
 
         # Must create FastAPI app
@@ -72,18 +71,10 @@ class TestAPIEndpointsStructural:
         # Must create app instance
         has_app_instance = "app = FastAPI" in content
 
-        assert has_fastapi_app, (
-            "api.py must create a FastAPI application instance"
-        )
-        assert has_train_model, (
-            "api.py must have train_model function"
-        )
-        assert has_load_service, (
-            "api.py must have load_service function"
-        )
-        assert has_app_instance, (
-            "api.py must have app = FastAPI() instance"
-        )
+        assert has_fastapi_app, "api.py must create a FastAPI application instance"
+        assert has_train_model, "api.py must have train_model function"
+        assert has_load_service, "api.py must have load_service function"
+        assert has_app_instance, "api.py must have app = FastAPI() instance"
 
 
 class TestAPIBehaviorPatterns:
@@ -91,10 +82,10 @@ class TestAPIBehaviorPatterns:
 
     def test_api_empty_name_handling(self):
         """PDF: Empty string item name → ValueError."""
-        with open("/mnt/c/Users/kacha/receipt-tracker/categorize/transformer.py") as f:
+        with open(CATEGORIZE_DIR / "transformer.py") as f:
             tcontent = f.read()
 
-        with open("/mnt/c/Users/kacha/receipt-tracker/categorize/api.py") as f:
+        with open(CATEGORIZE_DIR / "api.py") as f:
             accontent = f.read()
 
         # The transformer must check for empty name
@@ -102,13 +93,14 @@ class TestAPIBehaviorPatterns:
         # The API should handle this (either 422 or 503)
         has_service_init = "load_service" in accontent
 
-        assert has_empty_check, (
-            "transformer.py must check for empty/whitespace item name"
+        assert has_empty_check, "transformer.py must check for empty/whitespace item name"
+        assert has_service_init, (
+            "api.py must expose load_service to surface transformer errors as HTTP errors"
         )
 
     def test_training_auto_retrain(self):
         """PDF: If model file doesn't exist, eval and load_service train it automatically."""
-        with open("/mnt/c/Users/kacha/receipt-tracker/categorize/api.py") as f:
+        with open(CATEGORIZE_DIR / "api.py") as f:
             content = f.read()
 
         # load_service should auto-train if model missing
@@ -119,15 +111,11 @@ class TestAPIBehaviorPatterns:
 
     def test_training_metrics(self):
         """PDF: Training must compute exact_match + micro_f1."""
-        with open("/mnt/c/Users/kacha/receipt-tracker/categorize/training.py") as f:
+        with open(CATEGORIZE_DIR / "training.py") as f:
             content = f.read()
 
         has_exact_match = "exact_match" in content
         has_micro_f1 = "micro_f1" in content or "f1" in content.lower()
 
-        assert has_exact_match, (
-            "training.py must compute exact_match metric"
-        )
-        assert has_micro_f1, (
-            "training.py must compute micro_f1 metric"
-        )
+        assert has_exact_match, "training.py must compute exact_match metric"
+        assert has_micro_f1, "training.py must compute micro_f1 metric"

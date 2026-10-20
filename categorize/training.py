@@ -50,6 +50,7 @@ DEFAULT_BASE_MODEL = "cointegrated/rubert-tiny"
 DEFAULT_MAX_LENGTH = 64
 DEFAULT_THRESHOLD = 0.5
 MAX_OVERSAMPLE_TARGET = 5000
+MAX_OVERSAMPLE_REPEAT = 4
 _TRAINER_PARAMS = inspect.signature(Trainer.__init__).parameters
 _TRAINING_ARGUMENT_PARAMS = inspect.signature(TrainingArguments.__init__).parameters
 
@@ -146,6 +147,14 @@ def _build_dataset(examples: list[TrainingExample], label_to_id: dict[str, int])
 
 
 def _oversample_training_dataset(dataset: Dataset) -> Dataset:
+    """Balance the train fold without turning a small class into a majority.
+
+    Repeating every class up to the majority count makes a class with a few
+    distinct texts (e.g. ``cafe``) appear thousands of times, and the model
+    starts using surface artefacts of that class instead of its meaning.
+    Each class is therefore capped at ``MAX_OVERSAMPLE_REPEAT`` passes over
+    its own examples.
+    """
     labels = [_primary_label(label_vector) for label_vector in dataset["labels"]]
     counts = Counter(labels)
     target_count = min(max(counts.values()), MAX_OVERSAMPLE_TARGET)
@@ -156,7 +165,8 @@ def _oversample_training_dataset(dataset: Dataset) -> Dataset:
     balanced_indices: list[int] = []
     for label in sorted(indices_by_label):
         indices = indices_by_label[label]
-        repeats = [indices[index % len(indices)] for index in range(target_count)]
+        label_target = min(target_count, len(indices) * MAX_OVERSAMPLE_REPEAT)
+        repeats = [indices[index % len(indices)] for index in range(label_target)]
         balanced_indices.extend(repeats)
     return dataset.select(balanced_indices)
 

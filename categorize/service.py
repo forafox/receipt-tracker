@@ -6,22 +6,23 @@ PDF requirements:
 - classify_items(items: list[Item]) -> list[ClassifiedItem]: classifies multiple items
 - classify_receipt(receipt: Receipt) -> ClassifiedReceipt: classifies all items in a receipt
 """
+
 from categorize.classifier import CategoryClassifier
 from common.models import ClassifiedItem, ClassifiedReceipt, Item, Receipt
 
 
 class CategoryService:
     """Service for classifying receipt items and receipts using a CategoryClassifier.
-    
+
     PDF flow: Item(name, quantity, total) → predict(name) → ClassifiedItem(categories=[...])
     """
-    
+
     def __init__(self, classifier: CategoryClassifier) -> None:
         self._classifier = classifier
 
     def classify_item(self, item: Item) -> ClassifiedItem:
         """Classify a single item and return a ClassifiedItem.
-        
+
         PDF flow: predict(item.name) → categories → ClassifiedItem
         """
         prediction = self._classifier.predict(item.name)

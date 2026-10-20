@@ -20,7 +20,7 @@
 | FastAPI `/classify/items` POST → {items: [Item]} → {items: [ClassifiedItem]} | endpoint exists | :white_check_mark: | |
 | FastAPI `/classify/receipt` POST → Receipt (M2→M3) → ClassifiedReceipt | endpoint exists | :white_check_mark: | |
 | FastAPI `/train` POST → {dataset_path, model_path} → 204, reload service | endpoint exists, returns 204 | :white_check_mark: | |
-| F1 on test split > 0.85 (macro/weighted) | Balanced holdout: micro_f1 0.9285, exact_match 0.9275 (`training_wb.csv`) | :white_check_mark: | Per-class: food 0.908, household 0.958, personal_care 0.925, medicine 0.921, cafe 0.880 |
+| F1 on test split > 0.85 (macro/weighted) | Balanced holdout: micro_f1 0.8907, exact_match 0.8898, balanced acc 0.8585 (`training_wb.csv`) | :white_check_mark: | Per-class: food 0.876, household 0.915, personal_care 0.876, medicine 0.898, cafe 0.727 |
 | Data: CSV `text,category` UTF-8 with header | `dataset.py` `load_training_examples` reads CSV, skips empty rows | :white_check_mark: | |
 | Data: seed 104 rows + HF up to max_per_category=30 | `external_dataset.py` `build_training_csv` implements seed + filtered HF rows | :white_check_mark: | |
 | Single GPU per launch discipline | Code structure supports GPU discipline; runtime enforcement via `CUDA_VISIBLE_DEVICES` | :warning: | PDF doesn't specify, harness requires it |
@@ -45,8 +45,8 @@
 ## Current State — What Is Ready
 
 ### Dataset
-- `categorize/data/training_wb.csv` — **24 127 строк**, основной датасет:
-  `food` 6000, `household` 6000, `personal_care` 6000, `medicine` 6000, `cafe` 127.
+- `categorize/data/training_wb.csv` — **24 219 строк**, основной датасет:
+  `food` 6000, `household` 6000, `personal_care` 6000, `medicine` 6000, `cafe` 219.
   - Источники: `nyuuzyou/wb-products` (Wildberries, CC0) — разметка по
     `subj_root_name`; русский срез Open Food Facts (4 430 названий) — для
     свежих продуктов, которых нет на WB.
@@ -54,6 +54,11 @@
     готовых блюд/напитков собран вручную.
   - Сборка выполнялась офлайн на GPU-сервере из сырых `.zst` (в репозиторий не
     входят); в git лежит только готовый CSV.
+  - Короткие «чековые» формы: префиксы 5/3/2 слов + первое слово названия для
+    300 самых частых (по числу названий, начинающихся с него). Квоты по длине
+    (300/800/1000/остальные) одинаковы у всех классов.
+  - Дедуп между классами и разрешение спорных первых слов по частоте: одно и
+    то же название не встречается с двумя разными метками.
 - `categorize/data/training_full.csv` — старый 5080-строчный датасет. **Не использовать**:
   `IvanTatarkin/ru-product-taxonomy` на 99 % состоит из Open Food Facts, и
   «русские» строки на деле французские (`Pain de mie`, `Andouille`).
@@ -61,22 +66,29 @@
 
 ### Training
 - Модель `categorize/models/category_transformer` обучена на `training_wb.csv`:
-  15 эпох, GPU (RTX 6000), `train_runtime ≈ 1121 c`, `train_loss ≈ 0.031`.
-- Сбалансированный holdout (20 %, 4 825 строк) — честные метрики:
+  15 эпох, GPU (RTX 6000), `train_runtime ≈ 1042 c`, `train_loss ≈ 0.063`.
+- Сбалансированный holdout (20 %, 4 844 строки) — честные метрики:
 
 | Категория | exact_match | micro_f1 | n |
 |---|---|---|---|
-| food | 0.9075 | 0.9081 | 1200 |
-| household | 0.9575 | 0.9588 | 1200 |
-| personal_care | 0.9250 | 0.9263 | 1200 |
-| medicine | 0.9208 | 0.9213 | 1200 |
-| cafe | 0.8800 | 0.9020 | 25 |
-| **итого** | **0.9275** | **0.9285** | **4825** |
+| food | 0.8758 | 0.8772 | 1200 |
+| household | 0.9150 | 0.9159 | 1200 |
+| personal_care | 0.8758 | 0.8777 | 1200 |
+| medicine | 0.8983 | 0.8980 | 1200 |
+| cafe | 0.7273 | 0.7273 | 44 |
+| **итого** | **0.8898** | **0.8907** | **4844** |
 
+- Сбалансированная точность по классам — 0.8585.
+- Проверка на 100 коротких «чековых» словах — 0.84; исходные 10 слов из
+  постановки (`молоко`, `сыр`, `яйца`, `кефир 1%`, `витамин D3`,
+  `стиральный порошок`, `шампунь`, `аспирин`, `капучино`, `салат цезарь`) — 10/10.
 - `categorize/training.py` совместим с `transformers` 4.39 и 4.57:
   `eval_strategy`/`evaluation_strategy` и `processing_class`/`tokenizer`
   выбираются по сигнатуре установленной версии.
-- Oversampling train-фолда ограничен `MAX_OVERSAMPLE_TARGET = 5000`.
+- Oversampling train-фолда ограничен `MAX_OVERSAMPLE_TARGET = 5000` и
+  `MAX_OVERSAMPLE_REPEAT = 4`: класс повторяется не более 4 раз, иначе `cafe`
+  (219 строк) раздувается до 20 % трейна и модель начинает предсказывать его
+  по длине строки, а не по словам.
 - `--epochs` CLI flag (по умолчанию 6.0).
 
 ### CLI
@@ -87,10 +99,13 @@
 | `python -m categorize eval --dataset ... --model ...` | Exact-match + micro-F1 |
 
 ### Known Limitations
-- `cafe` размечен вручную (127 строк), поэтому метрика по нему шумная (n=25 в holdout).
+- `cafe` размечен вручную (219 строк), поэтому метрика по нему шумная (n=44 в holdout).
 - WB — маркетплейс, а не OCR чеков: названия длиннее и «чище», чем в реальном чеке.
-- Основная путаница модели: `food` → `medicine` (75 из 1200) и `medicine` ↔
-  `personal_care` (36/28) — БАДы и лечебная косметика пересекаются.
+- Основная путаница модели: `food` → `medicine` (81 из 1200), `household` ↔
+  `personal_care` (51/62) и `medicine` → `food` (60) — БАДы, лечебная косметика
+  и бытовая химия пересекаются.
+- На коротких словах без контекста модель ошибается там, где сама метка спорна
+  (`суп` → food, `сахар`/`соль` → personal_care, `батарейки`/`лампочка` → medicine).
 - `IvanTatarkin/ru-product-taxonomy` для обучения больше не используется.
 - `uv run python` в этом окружении нестабилен (таймауты/OOM); используется
   `/usr/bin/python3`.

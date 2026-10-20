@@ -12,6 +12,7 @@ PDF requirements:
 - _map_row(row): map a HF dataset row to (text, category) or None
 - _extract_category(row): extract category label from HF row
 - _to_receipt_category(raw_category): normalize HF category to receipt category"""
+
 from __future__ import annotations
 
 import csv
@@ -58,14 +59,14 @@ def build_training_csv(
     max_per_category: int = 30,
 ) -> None:
     """Build a balanced training CSV from seed examples + HF dataset.
-    
+
     PDF behavior:
     - Load seed examples from seed_path (CSV with text,category)
     - Load up to `limit` rows from HF dataset (filtered by lang_hint=="ru")
     - Map HF labels to receipt categories using RECEIPT_CATEGORY_MAP
     - Enforce max_per_category per receipt category
     - Combine and write as CSV: text,category
-    
+
     Args:
         output_path: Path to write the output CSV
         seed_path: Path to seed CSV (text,category)
@@ -98,7 +99,7 @@ def _balanced_rows(
         category = row["category"]
         if len(rows_by_category[category]) < max_per_category:
             rows_by_category[category].append(row)
-    
+
     balanced: list[dict[str, str]] = []
     for category in sorted(rows_by_category):
         balanced.extend(rows_by_category[category])
@@ -161,7 +162,7 @@ def _extract_category(row: dict[str, Any]) -> str | None:
 
 def _to_receipt_category(raw_category: str) -> str | None:
     """Normalize a raw category string to a receipt category.
-    
+
     PDF behavior:
     - Lowercase and normalize (replace _ with space, / with space)
     - If starts with "food" -> "food"

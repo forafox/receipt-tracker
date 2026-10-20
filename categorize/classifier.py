@@ -3,9 +3,10 @@
 The PDF defines the contract: predict(item_name) -> CategoryPrediction.
 This module provides the Protocol and the Pydantic models used for the contract.
 """
+
 from typing import Protocol
 
-from common.models import CategoryScore, CategoryPrediction
+from common.models import CategoryPrediction
 
 
 class CategoryClassifier(Protocol):
@@ -13,6 +14,7 @@ class CategoryClassifier(Protocol):
 
     PDF requirement: CategoryClassifier with predict(item_name) -> CategoryPrediction.
     """
+
     def predict(self, item_name: str) -> CategoryPrediction:
         """Classify a product item name into categories.
 
