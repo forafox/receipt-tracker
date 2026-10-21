@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from common.contracts import Item
 from extract.parser import parse_receipt
 
 MOSCOW_TIMEZONE = ZoneInfo("Europe/Moscow")
@@ -27,7 +28,7 @@ def test_parse_receipt_extracts_unknown_merchant_without_brand_whitelist() -> No
     assert receipt.datetime == datetime(2026, 10, 5, 18, 20, tzinfo=MOSCOW_TIMEZONE)
     assert receipt.datetime.tzinfo is MOSCOW_TIMEZONE
     assert receipt.total == Decimal("250.00")
-    assert receipt.items == []
+    assert receipt.items == [Item(name="КАПУЧИНО", sum=Decimal("250.00"))]
     assert receipt.warnings == []
 
 

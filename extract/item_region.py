@@ -1,6 +1,6 @@
 import re
 
-from extract.parser import (
+from extract._text import (
     _DATETIME_PATTERN,
     _TOTAL_LABEL_REGEXES,
     SERVICE_LINE_PREFIXES,

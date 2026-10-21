@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from common.contracts import Item
 from extract.item_region import _select_item_candidate_lines
 from extract.parser import parse_receipt
 
@@ -33,7 +34,10 @@ def test_unknown_merchant_items_and_public_parser_compatibility() -> None:
     assert receipt.store == "КОФЕЙНЯ У ДЯДИ ВАСИ"
     assert receipt.datetime == datetime(2026, 10, 5, 18, 20, tzinfo=timezone)
     assert receipt.total == Decimal("400.00")
-    assert receipt.items == []
+    assert receipt.items == [
+        Item(name="КАПУЧИНО", sum=Decimal("250.00")),
+        Item(name="КРУАССАН", sum=Decimal("150.00")),
+    ]
     assert receipt.warnings == []
 
 
