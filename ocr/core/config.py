@@ -14,7 +14,7 @@ class OcrSettings(BaseSettings):
         tesseract_config: Extra Tesseract configuration flags.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="OCR_")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="OCR_", extra="ignore")
 
     engine: str = "tesseract"
     tesseract_languages: str = "rus+eng"
