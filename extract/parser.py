@@ -1,36 +1,28 @@
 import re
 from datetime import datetime, tzinfo
-from decimal import Decimal, InvalidOperation
 
 from common.contracts import Receipt
+from common.ocr import OcrResult
+from extract._text import (
+    _DATETIME_PATTERN,
+    SERVICE_LINE_PREFIXES,
+    _contains_total_label,
+    _extract_total,
+    _has_service_prefix,
+)
+from extract.item_region import _can_reconcile_item_region, _select_item_candidate_lines
+from extract.items import _parse_simple_item_line
+from extract.layout import reconstruct_layout
+from extract.layout_items import _extract_layout_items
+from extract.validation import _validate_arithmetic
 
 STORE_HEADER_LINE_LIMIT = 10
-SERVICE_LINE_PREFIXES = (
-    "инн",
-    "ккт",
-    "фн",
-    "фд",
-    "фп",
-    "фпд",
-    "касса",
-    "смена",
-    "чек",
-    "кассир",
-)
-TOTAL_LABEL_PATTERNS = (
-    r"\bк\s+оплате\b",
-    r"\bитого\b",
-    r"\bитог\b",
-)
 
 STORE_NOT_FOUND = "store_not_found"
 DATETIME_NOT_FOUND = "datetime_not_found"
 TOTAL_NOT_FOUND = "total_not_found"
 
-_DATETIME_PATTERN = re.compile(r"(?<!\d)(\d{2}\.\d{2}\.\d{4}[ \t]+\d{2}:\d{2}(?::\d{2})?)(?![:\d])")
-_AMOUNT_PATTERN = re.compile(r"(?<![\d.,])(?:\d{1,3}(?:[ \u00a0]+\d{3})+|\d+)[,.]\d{2}(?!\d)")
 _NUMBER_ONLY_PATTERN = re.compile(r"[\d\s.,:+\-№#]+")
-_TOTAL_LABEL_REGEXES = tuple(re.compile(pattern, re.IGNORECASE) for pattern in TOTAL_LABEL_PATTERNS)
 
 
 def parse_receipt(text: str, *, timezone: tzinfo) -> Receipt:
@@ -44,7 +36,47 @@ def parse_receipt(text: str, *, timezone: tzinfo) -> Receipt:
         Receipt containing extracted fields and non-fatal parsing warnings.
     """
     lines = [line.strip() for line in text.splitlines() if line.strip()]
+    receipt = _parse_receipt_fields(text, lines, timezone)
+    parsed_candidates = [
+        _parse_simple_item_line(line)
+        for line in _select_item_candidate_lines(lines, store=receipt.store)
+    ]
+    receipt.items = [item for item in parsed_candidates if item is not None]
+    _validate_arithmetic(
+        receipt,
+        extraction_complete=all(item is not None for item in parsed_candidates)
+        and _can_reconcile_item_region(lines, store=receipt.store),
+    )
+    return receipt
 
+
+def parse_ocr_result(result: OcrResult, *, timezone: tzinfo) -> Receipt:
+    """Parse receipt items using reconstructed OCR rows and their spatial relationships.
+
+    Args:
+        result: Recognized fragments with absolute-pixel bounding boxes.
+        timezone: Timezone to attach to a parsed local receipt datetime.
+
+    Returns:
+        Receipt with geometry-associated items, field warnings and applicable arithmetic warnings.
+
+    Raises:
+        ValueError: If a bounding-box coordinate is not finite.
+    """
+    layout = reconstruct_layout(result)
+    text = "\n".join(line.text for line in layout)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    receipt = _parse_receipt_fields(text, lines, timezone)
+    receipt.items, extraction_complete = _extract_layout_items(layout, store=receipt.store)
+    _validate_arithmetic(
+        receipt,
+        extraction_complete=extraction_complete
+        and _can_reconcile_item_region(lines, store=receipt.store),
+    )
+    return receipt
+
+
+def _parse_receipt_fields(text: str, lines: list[str], timezone: tzinfo) -> Receipt:
     store = _extract_store(lines)
     receipt_datetime = _extract_datetime(text, timezone)
     total = _extract_total(lines)
@@ -61,7 +93,6 @@ def parse_receipt(text: str, *, timezone: tzinfo) -> Receipt:
         store=store,
         datetime=receipt_datetime,
         total=total,
-        items=[],
         warnings=warnings,
     )
 
@@ -85,15 +116,6 @@ def _is_plausible_store_line(line: str) -> bool:
     return any(character.isalpha() for character in line)
 
 
-def _has_service_prefix(line: str, prefix: str) -> bool:
-    if line == prefix:
-        return True
-    if not line.startswith(prefix):
-        return False
-    next_character = line[len(prefix)]
-    return next_character.isspace() or next_character in ":=№#"
-
-
 def _extract_datetime(text: str, timezone: tzinfo) -> datetime | None:
     for match in _DATETIME_PATTERN.finditer(text):
         value = " ".join(match.group(1).split())
@@ -104,25 +126,3 @@ def _extract_datetime(text: str, timezone: tzinfo) -> datetime | None:
             continue
         return parsed.replace(tzinfo=timezone)
     return None
-
-
-def _extract_total(lines: list[str]) -> Decimal | None:
-    for line in reversed(lines):
-        if not _contains_total_label(line):
-            continue
-
-        for match in reversed(list(_AMOUNT_PATTERN.finditer(line))):
-            try:
-                return _parse_decimal(match.group())
-            except InvalidOperation:
-                continue
-    return None
-
-
-def _contains_total_label(line: str) -> bool:
-    return any(pattern.search(line) for pattern in _TOTAL_LABEL_REGEXES)
-
-
-def _parse_decimal(value: str) -> Decimal:
-    normalized = value.replace(" ", "").replace("\u00a0", "").replace(",", ".")
-    return Decimal(normalized)
