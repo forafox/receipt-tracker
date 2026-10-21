@@ -17,7 +17,7 @@ _NUMERIC_FRAGMENT = re.compile(r"[\d\s.,]+")
 _PERCENT_FRAGMENT = re.compile(r"\d+(?:[.,]\d+)?\s*%")
 
 
-def _extract_layout_items(lines: list[LayoutLine], *, store: str | None) -> list[Item]:
+def _extract_layout_items(lines: list[LayoutLine], *, store: str | None) -> tuple[list[Item], bool]:
     """Associate adjacent descriptions with explicit amounts, without deriving values.
 
     Description fragments and named rows must align within one text height;
@@ -33,10 +33,12 @@ def _extract_layout_items(lines: list[LayoutLine], *, store: str | None) -> list
         store: Previously identified merchant header, if available.
 
     Returns:
-        Items in reading order. All numeric fields come from explicit OCR text;
-        weight quantities retain the printed numeric value without unit conversion.
+        Items in reading order and whether every candidate independently produced
+        a named item. Multiline associations conservatively leave completeness unproven.
+        All values come from explicit text; weight quantities retain their printed numeric values.
     """
     candidates = set(_select_item_candidate_indices([line.text for line in lines], store=store))
+    standalone_rows: set[int] = set()
     pending: list[LayoutLine] = []
     items: list[Item] = []
     for index, line in enumerate(lines):
@@ -52,6 +54,7 @@ def _extract_layout_items(lines: list[LayoutLine], *, store: str | None) -> list
             if name and not (_is_item_name(name) or _PERCENT_FRAGMENT.fullmatch(name)):
                 pending.clear()
                 continue
+            has_name = bool(name)
             name = _complete_name(name, pending, line)
             quantity = _parse_decimal(quantity_match.group("quantity"))
             if _is_item_name(name) and quantity > 0:
@@ -63,9 +66,12 @@ def _extract_layout_items(lines: list[LayoutLine], *, store: str | None) -> list
                         sum=_parse_decimal(quantity_match.group("total")),
                     )
                 )
+                if has_name and len(text.splitlines()) == 1:
+                    standalone_rows.add(index)
         elif item := _simple_row_item(line):
             item.name = _complete_name(item.name, pending, line)
             items.append(item)
+            standalone_rows.add(index)
         elif _AMOUNT_PATTERN.fullmatch(text):
             if pending and line.x_min >= max(fragment.x_max for fragment in pending):
                 name = " ".join(fragment.text.strip() for fragment in pending)
@@ -77,7 +83,7 @@ def _extract_layout_items(lines: list[LayoutLine], *, store: str | None) -> list
             pending.append(line)
             continue
         pending.clear()
-    return items
+    return items, candidates.issubset(standalone_rows)
 
 
 def _has_usable_geometry(line: LayoutLine) -> bool:

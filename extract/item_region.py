@@ -1,9 +1,11 @@
 import re
 
 from extract._text import (
+    _AMOUNT_PATTERN,
     _DATETIME_PATTERN,
     _TOTAL_LABEL_REGEXES,
     SERVICE_LINE_PREFIXES,
+    _contains_total_label,
     _extract_total,
     _has_service_prefix,
 )
@@ -19,6 +21,16 @@ _HEADER_PREFIXES = (
 )
 _PAYMENT_PREFIXES = ("картой", "наличными", "сдача", "безналичными", "безналичный расчет")
 _FOOTER_PREFIXES = ("спасибо за покупку", "сайт фнс", "www.nalog.ru")
+_ADJUSTMENT_PREFIXES = (
+    "скидка",
+    "сумма скидки",
+    "наценка",
+    "коррекция",
+    "округление",
+    "бонусы",
+    "списано бонусов",
+    "возврат",
+)
 _DATE_OR_TIME_PATTERN = re.compile(r"(?:\d{2}\.\d{2}\.\d{4}|\d{2}:\d{2}(?::\d{2})?)")
 _SUMMARY_PATTERN = re.compile(
     r"(?:скидка|сумма скидки|ндс|сумма ндс|без ндс)"
@@ -71,6 +83,40 @@ def _select_item_candidate_indices(lines: list[str], *, store: str | None) -> li
 
 def _is_total_line(line: str) -> bool:
     return any(pattern.match(line) for pattern in _TOTAL_LABEL_REGEXES)
+
+
+def _can_reconcile_item_region(lines: list[str], *, store: str | None) -> bool:
+    """Require a clear total boundary without unrepresented monetary summaries.
+
+    Args:
+        lines: Receipt rows, including metadata and summaries excluded from candidates.
+        store: Identified merchant; an amount in this header may indicate a lost item.
+
+    Returns:
+        Whether structural cues permit reconciliation, subject to actual candidate coverage.
+        Multiple total labels, early payment boundaries, adjustments and even tax summaries
+        conservatively disable the check. This cannot detect rows omitted entirely by OCR.
+    """
+    cleaned = [line.strip() for line in lines if line.strip()]
+    totals = [index for index, line in enumerate(cleaned) if _contains_total_label(line)]
+    if len(totals) != 1:
+        return False
+    total_index = totals[0]
+    if not _is_total_line(cleaned[total_index]) or _extract_total([cleaned[total_index]]) is None:
+        return False
+    if store is not None and _AMOUNT_PATTERN.search(store):
+        return False
+    if any(
+        _SUMMARY_PATTERN.fullmatch(line)
+        or any(_has_service_prefix(line.casefold(), prefix) for prefix in _ADJUSTMENT_PREFIXES)
+        for line in cleaned
+    ):
+        return False
+    return not any(
+        _has_service_prefix(line.casefold(), prefix)
+        for line in cleaned[:total_index]
+        for prefix in _PAYMENT_PREFIXES
+    )
 
 
 def _is_metadata_line(line: str) -> bool:

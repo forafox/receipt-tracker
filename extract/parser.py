@@ -10,10 +10,11 @@ from extract._text import (
     _extract_total,
     _has_service_prefix,
 )
-from extract.item_region import _select_item_candidate_lines
+from extract.item_region import _can_reconcile_item_region, _select_item_candidate_lines
 from extract.items import _parse_simple_item_line
 from extract.layout import reconstruct_layout
 from extract.layout_items import _extract_layout_items
+from extract.validation import _validate_arithmetic
 
 STORE_HEADER_LINE_LIMIT = 10
 
@@ -36,11 +37,16 @@ def parse_receipt(text: str, *, timezone: tzinfo) -> Receipt:
     """
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     receipt = _parse_receipt_fields(text, lines, timezone)
-    receipt.items = [
-        item
+    parsed_candidates = [
+        _parse_simple_item_line(line)
         for line in _select_item_candidate_lines(lines, store=receipt.store)
-        if (item := _parse_simple_item_line(line)) is not None
     ]
+    receipt.items = [item for item in parsed_candidates if item is not None]
+    _validate_arithmetic(
+        receipt,
+        extraction_complete=all(item is not None for item in parsed_candidates)
+        and _can_reconcile_item_region(lines, store=receipt.store),
+    )
     return receipt
 
 
@@ -52,7 +58,7 @@ def parse_ocr_result(result: OcrResult, *, timezone: tzinfo) -> Receipt:
         timezone: Timezone to attach to a parsed local receipt datetime.
 
     Returns:
-        Receipt with geometry-associated items and the existing field parsing warnings.
+        Receipt with geometry-associated items, field warnings and applicable arithmetic warnings.
 
     Raises:
         ValueError: If a bounding-box coordinate is not finite.
@@ -61,7 +67,12 @@ def parse_ocr_result(result: OcrResult, *, timezone: tzinfo) -> Receipt:
     text = "\n".join(line.text for line in layout)
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     receipt = _parse_receipt_fields(text, lines, timezone)
-    receipt.items = _extract_layout_items(layout, store=receipt.store)
+    receipt.items, extraction_complete = _extract_layout_items(layout, store=receipt.store)
+    _validate_arithmetic(
+        receipt,
+        extraction_complete=extraction_complete
+        and _can_reconcile_item_region(lines, store=receipt.store),
+    )
     return receipt
 
 

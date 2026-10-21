@@ -61,7 +61,7 @@ def test_simple_items_use_shuffled_blocks_and_preserve_existing_receipt_fields()
     assert parse_ocr_result(result, timezone=MOSCOW_TIMEZONE) == receipt
 
 
-def test_multi_block_row_parses_explicit_values_without_arithmetic_reconciliation() -> None:
+def test_multi_block_row_preserves_explicit_values_with_arithmetic_warnings() -> None:
     result = _result(
         [
             _block("МОЛОКО", 10, 60, 60),
@@ -79,7 +79,7 @@ def test_multi_block_row_parses_explicit_values_without_arithmetic_reconciliatio
         Item(name="МОЛОКО", quantity=Decimal("2"), price=Decimal("50.00"), sum=Decimal("99.00"))
     ]
     assert receipt.total == Decimal("300.00")
-    assert receipt.warnings == []
+    assert receipt.warnings == ["item_amount_mismatch", "items_total_mismatch"]
 
 
 def test_simple_name_fragments_preserve_product_numbers_and_duplicate_items() -> None:
