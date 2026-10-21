@@ -42,17 +42,21 @@ def _select_item_candidate_lines(lines: list[str], *, store: str | None) -> list
     Returns:
         Cleaned candidate lines in their original order, without joining fragments.
     """
-    cleaned_lines = [line.strip() for line in lines if line.strip()]
+    return [lines[index].strip() for index in _select_item_candidate_indices(lines, store=store)]
+
+
+def _select_item_candidate_indices(lines: list[str], *, store: str | None) -> list[int]:
+    cleaned_lines = [(index, line.strip()) for index, line in enumerate(lines) if line.strip()]
     region_end = len(cleaned_lines)
     for index in range(len(cleaned_lines) - 1, -1, -1):
-        line = cleaned_lines[index]
+        _, line = cleaned_lines[index]
         if _is_total_line(line) and _extract_total([line]) is not None:
             region_end = index
             break
 
-    candidates: list[str] = []
+    candidates: list[int] = []
     merchant_removed = False
-    for line in cleaned_lines[:region_end]:
+    for index, line in cleaned_lines[:region_end]:
         folded_line = line.casefold()
         if store is not None and not merchant_removed and folded_line == store.strip().casefold():
             merchant_removed = True
@@ -61,7 +65,7 @@ def _select_item_candidate_lines(lines: list[str], *, store: str | None) -> list
             break
         if _is_metadata_line(line) or not any(character.isalnum() for character in line):
             continue
-        candidates.append(line)
+        candidates.append(index)
     return candidates
 
 

@@ -2,6 +2,7 @@ import re
 from datetime import datetime, tzinfo
 
 from common.contracts import Receipt
+from common.ocr import OcrResult
 from extract._text import (
     _DATETIME_PATTERN,
     SERVICE_LINE_PREFIXES,
@@ -11,6 +12,8 @@ from extract._text import (
 )
 from extract.item_region import _select_item_candidate_lines
 from extract.items import _parse_simple_item_line
+from extract.layout import reconstruct_layout
+from extract.layout_items import _extract_layout_items
 
 STORE_HEADER_LINE_LIMIT = 10
 
@@ -32,15 +35,40 @@ def parse_receipt(text: str, *, timezone: tzinfo) -> Receipt:
         Receipt containing extracted fields and non-fatal parsing warnings.
     """
     lines = [line.strip() for line in text.splitlines() if line.strip()]
+    receipt = _parse_receipt_fields(text, lines, timezone)
+    receipt.items = [
+        item
+        for line in _select_item_candidate_lines(lines, store=receipt.store)
+        if (item := _parse_simple_item_line(line)) is not None
+    ]
+    return receipt
 
+
+def parse_ocr_result(result: OcrResult, *, timezone: tzinfo) -> Receipt:
+    """Parse receipt items using reconstructed OCR rows and their spatial relationships.
+
+    Args:
+        result: Recognized fragments with absolute-pixel bounding boxes.
+        timezone: Timezone to attach to a parsed local receipt datetime.
+
+    Returns:
+        Receipt with geometry-associated items and the existing field parsing warnings.
+
+    Raises:
+        ValueError: If a bounding-box coordinate is not finite.
+    """
+    layout = reconstruct_layout(result)
+    text = "\n".join(line.text for line in layout)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    receipt = _parse_receipt_fields(text, lines, timezone)
+    receipt.items = _extract_layout_items(layout, store=receipt.store)
+    return receipt
+
+
+def _parse_receipt_fields(text: str, lines: list[str], timezone: tzinfo) -> Receipt:
     store = _extract_store(lines)
     receipt_datetime = _extract_datetime(text, timezone)
     total = _extract_total(lines)
-    items = [
-        item
-        for line in _select_item_candidate_lines(lines, store=store)
-        if (item := _parse_simple_item_line(line)) is not None
-    ]
 
     warnings: list[str] = []
     if store is None:
@@ -54,7 +82,6 @@ def parse_receipt(text: str, *, timezone: tzinfo) -> Receipt:
         store=store,
         datetime=receipt_datetime,
         total=total,
-        items=items,
         warnings=warnings,
     )
 

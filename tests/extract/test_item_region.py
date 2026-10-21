@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from common.contracts import Item
-from extract.item_region import _select_item_candidate_lines
+from extract.item_region import _select_item_candidate_indices, _select_item_candidate_lines
 from extract.parser import parse_receipt
 
 
@@ -138,3 +138,14 @@ def test_empty_or_metadata_only_receipt_has_no_candidates(
     lines: list[str], store: str | None
 ) -> None:
     assert _select_item_candidate_lines(lines, store=store) == []
+
+
+def test_candidate_indices_preserve_original_positions_with_blanks_and_repeated_text() -> None:
+    lines = [" ", "Лавка", "", "  Лавка  ", "ЧАЙ 50.00", "ЧАЙ 50.00", "КАРТОЙ 100.00"]
+
+    assert _select_item_candidate_indices(lines, store="Лавка") == [3, 4, 5]
+    assert _select_item_candidate_lines(lines, store="Лавка") == [
+        "Лавка",
+        "ЧАЙ 50.00",
+        "ЧАЙ 50.00",
+    ]

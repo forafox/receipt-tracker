@@ -23,13 +23,17 @@ def _parse_simple_item_line(line: str) -> Item | None:
     if match is None:
         return None
     name = match.group("name").strip()
-    if not any(character.isalpha() for character in name) or name.endswith(("-", "+")):
-        return None
-    if _MULTIPLICATION_PATTERN.search(name):
-        return None
-    if any(
-        amount.end() == len(name) or name[amount.end()].isspace()
-        for amount in _AMOUNT_PATTERN.finditer(name)
-    ):
+    if not _is_item_name(name):
         return None
     return Item(name=name, sum=_parse_decimal(match.group("amount")))
+
+
+def _is_item_name(name: str) -> bool:
+    if not any(character.isalpha() for character in name) or name.endswith(("-", "+")):
+        return False
+    if _MULTIPLICATION_PATTERN.search(name):
+        return False
+    return not any(
+        amount.end() == len(name) or name[amount.end()].isspace()
+        for amount in _AMOUNT_PATTERN.finditer(name)
+    )
