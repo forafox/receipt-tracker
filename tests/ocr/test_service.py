@@ -7,7 +7,6 @@ import pytest
 from common.ocr import OcrEngine, OcrResult, TextBlock
 from ocr.core.config import OcrSettings
 from ocr.service import OcrService, build_default_ocr_service
-from pipeline import TextRecognizer
 
 
 class FakeEngine:
@@ -38,11 +37,10 @@ def test_service_delegates_to_injected_engine() -> None:
 
 def test_service_satisfies_public_interfaces() -> None:
     engine: OcrEngine = OcrService(engine=FakeEngine())
-    recognizer: TextRecognizer = OcrService(engine=FakeEngine())
 
     assert engine.name == "fake"
     assert engine.recognize_blocks(b"image").blocks
-    assert recognizer.recognize(b"image") == "ИТОГО"
+    assert engine.recognize(b"image") == "ИТОГО"
 
 
 def test_engine_is_built_lazily(monkeypatch: pytest.MonkeyPatch) -> None:

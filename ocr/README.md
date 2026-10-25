@@ -71,8 +71,8 @@ ocr/
 - `TextBlock` — распознанный фрагмент: `text`, `bbox` (4 точки-полигона в пикселях), `confidence`.
 - `OcrResult` — список блоков и размеры исходного изображения.
 - `OcrEngine` — протокол с методами `recognize_blocks(image: bytes) -> OcrResult` и
-  `recognize(image: bytes) -> str`. Второй метод совпадает с `pipeline.TextRecognizer`, поэтому
-  движок можно передать в пайплайн без адаптера.
+  `recognize(image: bytes) -> str`. Пайплайн M4 зависит от этого протокола и вызывает
+  `recognize_blocks`, поэтому движок можно передать в пайплайн без адаптера.
 
 Выбор движка — через конфиг (`ocr.core.config.OcrSettings`, переменные окружения с префиксом `OCR_`):
 `OCR_ENGINE`, `OCR_TESSERACT_LANGUAGES`, `OCR_EASYOCR_LANGUAGES`, `OCR_MIN_CONFIDENCE`, `OCR_GPU`,

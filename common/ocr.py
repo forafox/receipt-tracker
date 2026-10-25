@@ -43,8 +43,8 @@ class OcrEngine(Protocol):
     """Interface for engines that locate and read text on a receipt image.
 
     Engines receive raw image bytes and return text fragments together with their
-    bounding boxes. ``recognize`` matches ``pipeline.TextRecognizer`` so an engine can be
-    passed to the receipt pipeline without an adapter.
+    bounding boxes. The receipt pipeline depends on this interface, so an engine can be
+    passed to it without an adapter.
     """
 
     name: str
