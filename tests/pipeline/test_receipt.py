@@ -1,6 +1,7 @@
 import re
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -15,6 +16,7 @@ from pipeline import (
     ReceiptUnreadable,
     RecognitionUnavailable,
 )
+from storage import SqliteReceiptStorage
 
 MOSCOW_TIMEZONE = ZoneInfo("Europe/Moscow")
 RECEIVED_AT = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
@@ -238,3 +240,58 @@ async def test_undo_deletes_last_receipt_of_user() -> None:
 
     assert deleted == Receipt(store="second")
     assert [receipt.store for _, receipt, _ in storage.saved] == ["first", "other user"]
+
+
+@pytest.mark.parametrize(
+    ("timezone", "inside", "outside"),
+    [
+        # Year rollover: the last minute of December belongs to December, midnight to January.
+        (
+            "Europe/Moscow",
+            datetime(2026, 12, 31, 23, 59),
+            datetime(2027, 1, 1, 0, 0),
+        ),
+        # Clocks go back on the last Sunday of October, so October and November have
+        # different UTC offsets in Berlin.
+        (
+            "Europe/Berlin",
+            datetime(2026, 10, 31, 23, 59),
+            datetime(2026, 11, 1, 0, 0),
+        ),
+        # Ahead of UTC by ten hours: local midnight of the 1st is still the previous day in UTC.
+        (
+            "Asia/Vladivostok",
+            datetime(2026, 11, 1, 0, 0),
+            datetime(2026, 10, 31, 23, 59),
+        ),
+    ],
+)
+async def test_monthly_summary_boundaries_with_sqlite(
+    tmp_path: Path, timezone: str, inside: datetime, outside: datetime
+) -> None:
+    zone = ZoneInfo(timezone)
+    inside, outside = inside.replace(tzinfo=zone), outside.replace(tzinfo=zone)
+    storage = SqliteReceiptStorage(tmp_path / "receipts.sqlite")
+    storage.save(1, Receipt(store="inside", total=Decimal("10.00")), inside)
+    storage.save(1, Receipt(store="outside", total=Decimal("99.00")), outside)
+    pipeline = ReceiptPipeline(FakeRecognizer(""), storage, zone)
+
+    summary = await pipeline.monthly_summary(1, inside.astimezone(UTC))
+
+    assert summary == MonthlySummary(
+        month=inside.date().replace(day=1), receipt_count=1, total=Decimal("10.00")
+    )
+
+
+async def test_receipt_without_date_sent_after_local_midnight_counts_in_new_month() -> None:
+    storage = FakeStorage()
+    pipeline = make_pipeline("ПЯТЁРОЧКА\nИТОГО 250,00", storage)
+    sent_at = datetime(2026, 10, 31, 21, 30, tzinfo=UTC)  # 1 November 00:30 in Moscow
+
+    await pipeline.process_photo(1, b"image", sent_at)
+    november = await pipeline.monthly_summary(1, sent_at)
+    october = await pipeline.monthly_summary(1, datetime(2026, 10, 31, 20, 59, tzinfo=UTC))
+
+    assert november.month == date(2026, 11, 1)
+    assert november.receipt_count == 1
+    assert october.receipt_count == 0
