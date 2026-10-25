@@ -3,6 +3,7 @@ from pipeline.receipt import (
     ReceiptAlreadySaved,
     ReceiptPipeline,
     ReceiptUnreadable,
+    RecognitionUnavailable,
 )
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "ReceiptAlreadySaved",
     "ReceiptPipeline",
     "ReceiptUnreadable",
+    "RecognitionUnavailable",
 ]

@@ -7,7 +7,7 @@ from decimal import Decimal
 from common.contracts import Receipt
 from common.ocr import OcrEngine
 from extract import parse_ocr_result
-from ocr import ImageDecodeError
+from ocr import ImageDecodeError, OcrError
 from storage import ReceiptStorage
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,10 @@ HISTORY_SIZE = 5
 
 class ReceiptUnreadable(Exception):
     """Raised when no useful receipt data can be extracted from a photo."""
+
+
+class RecognitionUnavailable(Exception):
+    """Raised when the OCR engine fails for reasons unrelated to the photo."""
 
 
 class ReceiptAlreadySaved(Exception):
@@ -68,11 +72,15 @@ class ReceiptPipeline:
             ReceiptUnreadable: If the image cannot be decoded or neither the date nor the total
                 was found.
             ReceiptAlreadySaved: If the user has already saved the same receipt.
+            RecognitionUnavailable: If the OCR engine itself failed.
         """
         try:
             blocks = await asyncio.to_thread(self._recognizer.recognize_blocks, photo)
         except ImageDecodeError as error:
             raise ReceiptUnreadable from error
+        except OcrError as error:
+            logger.exception("OCR engine %s failed", self._recognizer.name)
+            raise RecognitionUnavailable from error
         receipt = parse_ocr_result(blocks, timezone=self._timezone)
         if receipt.datetime is None and receipt.total is None:
             raise ReceiptUnreadable

@@ -15,6 +15,7 @@ class Texts:
         error: Reply sent when receipt processing fails.
         unreadable: Reply sent when nothing useful was found on a photo.
         duplicate: Reply sent when the receipt was already saved.
+        recognition_unavailable: Reply sent when text recognition is temporarily failing.
         month_empty: Reply sent when no receipts were saved this month.
         month_spending: Label for the monthly spending.
         history_empty: Reply sent when the user has no saved receipts.
@@ -39,6 +40,7 @@ class Texts:
     error: str
     unreadable: str
     duplicate: str
+    recognition_unavailable: str
     month_empty: str
     month_spending: str
     history_empty: str
@@ -71,6 +73,7 @@ RU = Texts(
     error="Не получилось обработать чек. Попробуйте ещё раз позже.",
     unreadable="Не удалось распознать чек. Сфотографируйте его ровно и при хорошем освещении.",
     duplicate="Этот чек уже сохранён, повторно он не учитывается.",
+    recognition_unavailable="Распознавание временно недоступно. Попробуйте через несколько минут.",
     month_empty="В этом месяце чеков пока нет.",
     month_spending="Расходы за",
     history_empty="Сохранённых чеков пока нет.",
@@ -104,6 +107,7 @@ EN = Texts(
     error="Could not process the receipt. Please try again later.",
     unreadable="Could not read the receipt. Take a straight photo in good light.",
     duplicate="This receipt is already saved and will not be counted twice.",
+    recognition_unavailable="Recognition is temporarily unavailable. Try again in a few minutes.",
     month_empty="No receipts this month yet.",
     month_spending="Spending for",
     history_empty="No saved receipts yet.",
