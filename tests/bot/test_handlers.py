@@ -14,7 +14,12 @@ from bot.handlers import (
 )
 from bot.texts import EN, RU
 from common.contracts import Receipt
-from pipeline import MonthlySummary, ReceiptAlreadySaved, ReceiptUnreadable
+from pipeline import (
+    MonthlySummary,
+    ReceiptAlreadySaved,
+    ReceiptUnreadable,
+    RecognitionUnavailable,
+)
 
 SENT_AT = datetime(2026, 10, 11, 9, 0, tzinfo=ZoneInfo("UTC"))
 RECEIPT = Receipt(
@@ -164,3 +169,12 @@ async def test_undo_without_receipts() -> None:
     await handle_undo(message, FakeService(last=None), EN)
 
     message.answer.assert_awaited_once_with(EN.undo_empty)
+
+
+async def test_photo_reports_temporary_recognition_failure() -> None:
+    message = make_message()
+    error = RecognitionUnavailable()
+
+    await handle_photo(message, make_bot(b"image"), FakeService(error), EN)
+
+    message.answer.assert_awaited_once_with(EN.recognition_unavailable)

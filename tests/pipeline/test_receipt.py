@@ -8,7 +8,13 @@ import pytest
 from common.contracts import Item, Receipt
 from common.ocr import OcrResult, TextBlock
 from ocr import ImageDecodeError, OcrEngineUnavailableError
-from pipeline import MonthlySummary, ReceiptAlreadySaved, ReceiptPipeline, ReceiptUnreadable
+from pipeline import (
+    MonthlySummary,
+    ReceiptAlreadySaved,
+    ReceiptPipeline,
+    ReceiptUnreadable,
+    RecognitionUnavailable,
+)
 
 MOSCOW_TIMEZONE = ZoneInfo("Europe/Moscow")
 RECEIVED_AT = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
@@ -157,12 +163,16 @@ async def test_undecodable_image_is_unreadable() -> None:
     assert storage.saved == []
 
 
-async def test_unavailable_engine_is_not_reported_as_unreadable() -> None:
+async def test_engine_failure_is_reported_as_temporary() -> None:
     error = OcrEngineUnavailableError("tesseract binary not found")
-    pipeline = ReceiptPipeline(FailingRecognizer(error), FakeStorage(), MOSCOW_TIMEZONE)
+    storage = FakeStorage()
+    pipeline = ReceiptPipeline(FailingRecognizer(error), storage, MOSCOW_TIMEZONE)
 
-    with pytest.raises(OcrEngineUnavailableError):
+    with pytest.raises(RecognitionUnavailable) as raised:
         await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert raised.value.__cause__ is error
+    assert storage.saved == []
 
 
 async def test_monthly_summary_uses_local_month_boundaries() -> None:
