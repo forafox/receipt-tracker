@@ -10,7 +10,6 @@ from common.ocr import OcrEngine, OcrResult, TextBlock
 from ocr.core.config import OcrSettings
 from ocr.core.ordering import blocks_to_text
 from ocr.engines.factory import build_ocr_engine
-from pipeline import TextRecognizer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -34,12 +33,11 @@ def _result() -> OcrResult:
     return OcrResult(blocks=[block], image_width=20, image_height=10)
 
 
-def test_fake_engine_satisfies_both_interfaces() -> None:
+def test_fake_engine_satisfies_ocr_engine_interface() -> None:
     engine: OcrEngine = FakeEngine(_result())
-    recognizer: TextRecognizer = FakeEngine(_result())
 
     assert engine.recognize_blocks(b"image") == _result()
-    assert recognizer.recognize(b"image") == "ИТОГО 250,00"
+    assert engine.recognize(b"image") == "ИТОГО 250,00"
 
 
 def test_build_ocr_engine_rejects_unknown_name() -> None:

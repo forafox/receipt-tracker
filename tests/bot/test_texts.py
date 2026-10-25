@@ -11,7 +11,7 @@ from bot.texts import (
     format_receipt,
     texts_for,
 )
-from common.contracts import Receipt
+from common.contracts import Item, Receipt
 from pipeline import MonthlySummary
 
 
@@ -39,3 +39,19 @@ def test_format_monthly_summary_without_receipts() -> None:
 
 def test_format_history_without_receipts() -> None:
     assert format_history([], RU) == RU.history_empty
+
+
+def test_format_receipt_lists_items() -> None:
+    receipt = Receipt(
+        store="ЛЕНТА",
+        total=Decimal("134.90"),
+        items=[
+            Item(name="МОЛОКО", sum=Decimal("89.9")),
+            Item(name="ХЛЕБ", sum=Decimal("45")),
+        ],
+    )
+
+    assert format_receipt(receipt, RU) == (
+        "Магазин: ЛЕНТА\nДата: не распознано\nСумма: 134.90\n"
+        "\nПокупки:\n- МОЛОКО: 89.90\n- ХЛЕБ: 45.00"
+    )

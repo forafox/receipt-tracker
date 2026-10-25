@@ -1,10 +1,12 @@
+import re
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from common.contracts import Receipt
+from common.contracts import Item, Receipt
+from common.ocr import OcrResult, TextBlock
 from ocr import ImageDecodeError, OcrEngineUnavailableError
 from pipeline import MonthlySummary, ReceiptAlreadySaved, ReceiptPipeline, ReceiptUnreadable
 
@@ -12,13 +14,37 @@ MOSCOW_TIMEZONE = ZoneInfo("Europe/Moscow")
 RECEIVED_AT = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
 
 
+CHARACTER_WIDTH = 20
+LINE_HEIGHT = 40
+
+
+def blocks_from_text(text: str) -> OcrResult:
+    """Lay out text as OCR blocks: one row per line, columns split by two or more spaces."""
+    blocks = []
+    for row, line in enumerate(text.splitlines()):
+        left = 0
+        top = row * LINE_HEIGHT
+        for part in re.split(r"(\s{2,})", line):
+            right = left + CHARACTER_WIDTH * len(part)
+            if part.strip():
+                bbox = [(left, top), (right, top), (right, top + 30), (left, top + 30)]
+                blocks.append(TextBlock(text=part, bbox=bbox))
+            left = right
+    return OcrResult(blocks=blocks)
+
+
 class FakeRecognizer:
+    name = "fake"
+
     def __init__(self, text: str) -> None:
         self.text = text
         self.received: bytes | None = None
 
-    def recognize(self, image: bytes) -> str:
+    def recognize_blocks(self, image: bytes) -> OcrResult:
         self.received = image
+        return blocks_from_text(self.text)
+
+    def recognize(self, image: bytes) -> str:
         return self.text
 
 
@@ -69,6 +95,24 @@ async def test_pipeline_parses_and_saves_receipt() -> None:
     assert storage.saved == [(1, receipt, purchased_at)]
 
 
+async def test_pipeline_extracts_items_from_layout() -> None:
+    text = (
+        "ПЯТЁРОЧКА\n"
+        "05.10.2026 18:20\n"
+        "МОЛОКО 3.2%      89.90\n"
+        "ХЛЕБ             45.00\n"
+        "ИТОГО           134.90"
+    )
+
+    receipt = await make_pipeline(text).process_photo(1, b"image", RECEIVED_AT)
+
+    assert receipt.items == [
+        Item(name="МОЛОКО 3.2%", sum=Decimal("89.90")),
+        Item(name="ХЛЕБ", sum=Decimal("45.00")),
+    ]
+    assert receipt.warnings == []
+
+
 async def test_receipt_without_date_is_saved_at_receive_time() -> None:
     storage = FakeStorage()
 
@@ -91,8 +135,13 @@ async def test_unreadable_receipt_is_rejected_and_not_saved(text: str) -> None:
 
 
 class FailingRecognizer:
+    name = "failing"
+
     def __init__(self, error: Exception) -> None:
         self.error = error
+
+    def recognize_blocks(self, image: bytes) -> OcrResult:
+        raise self.error
 
     def recognize(self, image: bytes) -> str:
         raise self.error

@@ -3,10 +3,10 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, tzinfo
 from decimal import Decimal
-from typing import Protocol
 
 from common.contracts import Receipt
-from extract import parse_receipt
+from common.ocr import OcrEngine
+from extract import parse_ocr_result
 from ocr import ImageDecodeError
 from storage import ReceiptStorage
 
@@ -21,21 +21,6 @@ class ReceiptUnreadable(Exception):
 
 class ReceiptAlreadySaved(Exception):
     """Raised when the user has already saved the same receipt."""
-
-
-class TextRecognizer(Protocol):
-    """OCR step that turns a receipt image into plain text."""
-
-    def recognize(self, image: bytes) -> str:
-        """Recognize text on a receipt image.
-
-        Args:
-            image: Raw receipt image bytes.
-
-        Returns:
-            Recognized text with one receipt line per text line.
-        """
-        ...
 
 
 @dataclass(frozen=True)
@@ -56,13 +41,11 @@ class MonthlySummary:
 class ReceiptPipeline:
     """Runs the receipt processing steps in order."""
 
-    def __init__(
-        self, recognizer: TextRecognizer, storage: ReceiptStorage, timezone: tzinfo
-    ) -> None:
+    def __init__(self, recognizer: OcrEngine, storage: ReceiptStorage, timezone: tzinfo) -> None:
         """Create a pipeline.
 
         Args:
-            recognizer: OCR step.
+            recognizer: OCR step that returns text blocks with their positions.
             storage: Storage for parsed receipts.
             timezone: Timezone of the local time printed on receipts and of month boundaries.
         """
@@ -87,10 +70,10 @@ class ReceiptPipeline:
             ReceiptAlreadySaved: If the user has already saved the same receipt.
         """
         try:
-            text = await asyncio.to_thread(self._recognizer.recognize, photo)
+            blocks = await asyncio.to_thread(self._recognizer.recognize_blocks, photo)
         except ImageDecodeError as error:
             raise ReceiptUnreadable from error
-        receipt = parse_receipt(text, timezone=self._timezone)
+        receipt = parse_ocr_result(blocks, timezone=self._timezone)
         if receipt.datetime is None and receipt.total is None:
             raise ReceiptUnreadable
         purchased_at = receipt.datetime or received_at

@@ -25,6 +25,7 @@ class Texts:
         store: Label for the store name.
         date: Label for the purchase date.
         total: Label for the receipt total.
+        items: Heading of the purchased items list.
         not_found: Placeholder for a field that was not recognized.
         help_command: Localized help command description.
         month_command: Localized monthly report command description.
@@ -48,6 +49,7 @@ class Texts:
     store: str
     date: str
     total: str
+    items: str
     not_found: str
     help_command: str
     month_command: str
@@ -79,6 +81,7 @@ RU = Texts(
     store="Магазин",
     date="Дата",
     total="Сумма",
+    items="Покупки",
     not_found="не распознано",
     help_command="Справка",
     month_command="Расходы за месяц",
@@ -111,6 +114,7 @@ EN = Texts(
     store="Store",
     date="Date",
     total="Total",
+    items="Items",
     not_found="not recognized",
     help_command="Help",
     month_command="Spending this month",
@@ -145,12 +149,16 @@ def format_receipt(receipt: Receipt, texts: Texts) -> str:
         texts: Localized labels.
 
     Returns:
-        Message with the store, date and total of the receipt.
+        Message with the store, date and total of the receipt, followed by its items if any.
     """
     store = receipt.store or texts.not_found
     date = receipt.datetime.strftime("%d.%m.%Y %H:%M") if receipt.datetime else texts.not_found
     total = f"{receipt.total:.2f}" if receipt.total is not None else texts.not_found
-    return f"{texts.store}: {store}\n{texts.date}: {date}\n{texts.total}: {total}"
+    lines = [f"{texts.store}: {store}", f"{texts.date}: {date}", f"{texts.total}: {total}"]
+    if receipt.items:
+        lines.append(f"\n{texts.items}:")
+        lines.extend(f"- {item.name}: {item.sum:.2f}" for item in receipt.items)
+    return "\n".join(lines)
 
 
 def format_monthly_summary(summary: MonthlySummary, texts: Texts) -> str:
