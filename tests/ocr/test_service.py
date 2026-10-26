@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -57,6 +59,55 @@ def test_engine_is_built_lazily(monkeypatch: pytest.MonkeyPatch) -> None:
     assert service.name == "fake"
     service.process_receipt(b"image")
     assert len(built) == 1
+
+
+def test_concurrent_first_use_builds_engine_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    build_calls = 0
+    build_entered = threading.Event()
+    release_build = threading.Event()
+
+    def fake_build(settings: OcrSettings) -> FakeEngine:
+        nonlocal build_calls
+        build_calls += 1
+        build_entered.set()
+        if not release_build.wait(timeout=5):
+            raise TimeoutError("engine build was not released")
+        return FakeEngine()
+
+    monkeypatch.setattr("ocr.service.build_ocr_engine", fake_build)
+    service = OcrService(OcrSettings(engine="fake"))
+    worker_count = 8
+    start = threading.Barrier(worker_count)
+    results: list[OcrResult] = []
+    errors: list[BaseException] = []
+    results_lock = threading.Lock()
+
+    def worker() -> None:
+        start.wait(timeout=5)
+        try:
+            result = service.process_receipt(b"image")
+        except BaseException as error:
+            with results_lock:
+                errors.append(error)
+        else:
+            with results_lock:
+                results.append(result)
+
+    threads = [threading.Thread(target=worker) for _ in range(worker_count)]
+    for thread in threads:
+        thread.start()
+
+    assert build_entered.wait(timeout=5)
+    time.sleep(0.1)
+    release_build.set()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert not any(thread.is_alive() for thread in threads)
+    assert errors == []
+    assert len(results) == worker_count
+    assert all(result.blocks[0].text == "ИТОГО" for result in results)
+    assert build_calls == 1
 
 
 def test_default_service_uses_default_settings(

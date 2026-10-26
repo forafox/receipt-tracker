@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 from common.ocr import OcrEngine, OcrResult
 from ocr.core.config import OcrSettings
 from ocr.engines.factory import build_ocr_engine
@@ -11,7 +13,8 @@ class OcrService:
     The service reads engine settings from :class:`~ocr.core.config.OcrSettings`
     (environment variables with the ``OCR_`` prefix by default) and creates the engine
     lazily on first use, so constructing the service does not import heavy OCR
-    dependencies or download model weights.
+    dependencies or download model weights. Lazy creation is serialized, so concurrent
+    first calls share a single engine instance.
 
     Attributes:
         settings: Effective OCR settings used to build the engine.
@@ -29,6 +32,7 @@ class OcrService:
         """
         self._settings = settings if settings is not None else OcrSettings()
         self._engine = engine
+        self._engine_lock = threading.Lock()
         self.name = engine.name if engine is not None else self._settings.engine
 
     @property
@@ -74,9 +78,12 @@ class OcrService:
         return self._resolved_engine().recognize(image)
 
     def _resolved_engine(self) -> OcrEngine:
-        if self._engine is None:
-            self._engine = build_ocr_engine(self._settings)
-        return self._engine
+        if self._engine is not None:
+            return self._engine
+        with self._engine_lock:
+            if self._engine is None:
+                self._engine = build_ocr_engine(self._settings)
+            return self._engine
 
 
 def build_default_ocr_service() -> OcrService:
