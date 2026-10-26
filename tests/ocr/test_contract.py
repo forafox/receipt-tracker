@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import cv2
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
 from common.ocr import OcrResult, TextBlock
-from ocr.core.errors import ImageDecodeError
+from ocr.core.errors import ImageDecodeError, ImageTooLargeError
 from ocr.core.geometry import axis_aligned, iou
 from ocr.core.image import decode_image
 from ocr.core.ordering import blocks_to_text
@@ -12,6 +14,12 @@ from ocr.core.ordering import blocks_to_text
 
 def _block(text: str, x1: float, y1: float, x2: float, y2: float) -> TextBlock:
     return TextBlock(text=text, bbox=[(x1, y1), (x2, y1), (x2, y2), (x1, y2)])
+
+
+def _encode(image: np.ndarray) -> bytes:
+    success, buffer = cv2.imencode(".png", image)
+    assert success
+    return buffer.tobytes()
 
 
 def test_text_block_requires_four_points() -> None:
@@ -71,3 +79,23 @@ def test_blocks_to_text_separates_distant_blocks() -> None:
 def test_decode_image_rejects_garbage() -> None:
     with pytest.raises(ImageDecodeError):
         decode_image(b"not an image")
+
+
+def test_decode_image_rejects_payload_over_limit() -> None:
+    with pytest.raises(ImageTooLargeError):
+        decode_image(b"0123", max_bytes=3)
+
+
+def test_decode_image_rejects_pixels_over_limit() -> None:
+    encoded = _encode(np.zeros((10, 10, 3), dtype=np.uint8))
+
+    with pytest.raises(ImageTooLargeError):
+        decode_image(encoded, max_pixels=99)
+
+
+def test_decode_image_accepts_pixels_at_limit() -> None:
+    encoded = _encode(np.zeros((10, 10, 3), dtype=np.uint8))
+
+    decoded = decode_image(encoded, max_pixels=100)
+
+    assert decoded.shape == (10, 10, 3)
