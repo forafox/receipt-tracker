@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, tzinfo
 from decimal import Decimal
+from functools import partial
 
 from common.contracts import Receipt
 from common.ocr import OcrEngine
@@ -44,7 +45,11 @@ class MonthlySummary:
 
 
 class ReceiptPipeline:
-    """Runs the receipt processing steps in order."""
+    """Runs the receipt processing steps in order.
+
+    A receipt rejected as a duplicate is kept in memory until the user decides whether to
+    save it anyway. Only the latest such receipt per user is kept, and it is lost on restart.
+    """
 
     def __init__(self, recognizer: OcrEngine, storage: ReceiptStorage, timezone: tzinfo) -> None:
         """Create a pipeline.
@@ -57,6 +62,7 @@ class ReceiptPipeline:
         self._recognizer = recognizer
         self._storage = storage
         self._timezone = timezone
+        self._pending_duplicates: dict[int, tuple[Receipt, datetime]] = {}
 
     async def process_photo(self, user_id: int, photo: bytes, received_at: datetime) -> Receipt:
         """Recognize, parse and save a receipt photo.
@@ -109,8 +115,35 @@ class ReceiptPipeline:
             not saved,
         )
         if not saved:
+            self._pending_duplicates[user_id] = (receipt, purchased_at)
             raise ReceiptAlreadySaved
         return receipt
+
+    async def save_duplicate(self, user_id: int) -> Receipt | None:
+        """Save the receipt last rejected as a duplicate, after the user confirmed it.
+
+        Args:
+            user_id: Telegram user identifier.
+
+        Returns:
+            Saved receipt, or None if there is no pending duplicate.
+        """
+        pending = self._pending_duplicates.pop(user_id, None)
+        if pending is None:
+            return None
+        receipt, purchased_at = pending
+        await asyncio.to_thread(
+            partial(self._storage.save, allow_duplicate=True), user_id, receipt, purchased_at
+        )
+        return receipt
+
+    def discard_duplicate(self, user_id: int) -> None:
+        """Forget the receipt last rejected as a duplicate.
+
+        Args:
+            user_id: Telegram user identifier.
+        """
+        self._pending_duplicates.pop(user_id, None)
 
     async def monthly_summary(self, user_id: int, moment: datetime) -> MonthlySummary:
         """Sum a user's spending for the month containing a moment.

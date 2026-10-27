@@ -4,11 +4,17 @@ from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock
 from zoneinfo import ZoneInfo
 
+from aiogram.types import Message
+
 from bot.handlers import (
+    SAVE_DUPLICATE,
+    SKIP_DUPLICATE,
     handle_history,
     handle_image_document,
     handle_month,
     handle_photo,
+    handle_save_duplicate,
+    handle_skip_duplicate,
     handle_start,
     handle_undo,
 )
@@ -35,12 +41,20 @@ class FakeService:
         self.last = last
         self.received: tuple[int, bytes, datetime] | None = None
         self.received_month: tuple[int, datetime] | None = None
+        self.pending: Receipt | None = RECEIPT
 
     async def process_photo(self, user_id: int, photo: bytes, received_at: datetime) -> Receipt:
         if self.error is not None:
             raise self.error
         self.received = (user_id, photo, received_at)
         return RECEIPT
+
+    async def save_duplicate(self, user_id: int) -> Receipt | None:
+        pending, self.pending = self.pending, None
+        return pending
+
+    def discard_duplicate(self, user_id: int) -> None:
+        self.pending = None
 
     async def undo_last(self, user_id: int) -> Receipt | None:
         return self.last
@@ -133,12 +147,16 @@ async def test_image_document_is_processed_like_photo() -> None:
     message.answer.assert_awaited_once()
 
 
-async def test_photo_reports_duplicate_receipt() -> None:
+async def test_photo_asks_whether_to_save_duplicate() -> None:
     message = make_message()
 
     await handle_photo(message, make_bot(b"image"), FakeService(ReceiptAlreadySaved()), RU)
 
-    message.answer.assert_awaited_once_with(RU.duplicate)
+    message.answer.assert_awaited_once()
+    assert message.answer.await_args.args == (RU.duplicate,)
+    [buttons] = message.answer.await_args.kwargs["reply_markup"].inline_keyboard
+    assert [button.text for button in buttons] == [RU.duplicate_save, RU.duplicate_skip]
+    assert [button.callback_data for button in buttons] == [SAVE_DUPLICATE, SKIP_DUPLICATE]
 
 
 async def test_history_lists_recent_receipts() -> None:
@@ -191,3 +209,46 @@ async def test_too_large_image_document_is_not_downloaded() -> None:
     bot.download.assert_not_awaited()
     assert service.received is None
     message.answer.assert_awaited_once_with(RU.file_too_large)
+
+
+def make_callback() -> MagicMock:
+    callback = MagicMock()
+    callback.from_user.id = 42
+    callback.message = MagicMock(spec=Message)
+    callback.message.edit_text = AsyncMock()
+    callback.answer = AsyncMock()
+    return callback
+
+
+async def test_save_duplicate_replaces_question_with_saved_receipt() -> None:
+    callback = make_callback()
+    service = FakeService()
+
+    await handle_save_duplicate(callback, service, EN)
+
+    callback.message.edit_text.assert_awaited_once_with(
+        "Receipt saved again:\nStore: ПЯТЁРОЧКА\nDate: 05.10.2026 18:20\nTotal: 250.00"
+    )
+    callback.answer.assert_awaited_once()
+    assert service.pending is None
+
+
+async def test_save_duplicate_after_restart_asks_to_resend() -> None:
+    callback = make_callback()
+    service = FakeService()
+    service.pending = None
+
+    await handle_save_duplicate(callback, service, RU)
+
+    callback.message.edit_text.assert_awaited_once_with(RU.duplicate_expired)
+
+
+async def test_skip_duplicate_forgets_receipt() -> None:
+    callback = make_callback()
+    service = FakeService()
+
+    await handle_skip_duplicate(callback, service, RU)
+
+    assert service.pending is None
+    callback.message.edit_text.assert_awaited_once_with(RU.duplicate_skipped)
+    callback.answer.assert_awaited_once()

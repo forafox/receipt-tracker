@@ -3,7 +3,13 @@ from io import BytesIO
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Downloadable, Message
+from aiogram.types import (
+    CallbackQuery,
+    Downloadable,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 from aiogram.utils.chat_action import ChatActionSender
 
 from bot.service import ReceiptService
@@ -16,6 +22,9 @@ router = Router()
 
 # Bot API refuses to send files larger than this to bots.
 MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024
+
+SAVE_DUPLICATE = "duplicate:save"
+SKIP_DUPLICATE = "duplicate:skip"
 
 
 @router.message(CommandStart())
@@ -138,7 +147,8 @@ async def _process_image(
         except ReceiptUnreadable:
             reply = texts.unreadable
         except ReceiptAlreadySaved:
-            reply = texts.duplicate
+            await message.answer(texts.duplicate, reply_markup=_duplicate_keyboard(texts))
+            return
         except RecognitionUnavailable:
             reply = texts.recognition_unavailable
         except Exception:
@@ -156,3 +166,55 @@ async def handle_unknown(message: Message, texts: Texts) -> None:
         texts: Localized response texts.
     """
     await message.answer(texts.unknown)
+
+
+@router.callback_query(F.data == SAVE_DUPLICATE)
+async def handle_save_duplicate(
+    callback: CallbackQuery, service: ReceiptService, texts: Texts
+) -> None:
+    """Save a suspected duplicate after the user confirmed it.
+
+    Args:
+        callback: Button press on the duplicate question.
+        service: Receipt service that keeps the pending duplicate.
+        texts: Localized response texts.
+    """
+    receipt = await service.save_duplicate(callback.from_user.id)
+    if receipt is None:
+        reply = texts.duplicate_expired
+    else:
+        reply = f"{texts.duplicate_saved}\n{format_receipt(receipt, texts)}"
+    await _replace_question(callback, reply)
+
+
+@router.callback_query(F.data == SKIP_DUPLICATE)
+async def handle_skip_duplicate(
+    callback: CallbackQuery, service: ReceiptService, texts: Texts
+) -> None:
+    """Drop a suspected duplicate.
+
+    Args:
+        callback: Button press on the duplicate question.
+        service: Receipt service that keeps the pending duplicate.
+        texts: Localized response texts.
+    """
+    service.discard_duplicate(callback.from_user.id)
+    await _replace_question(callback, texts.duplicate_skipped)
+
+
+def _duplicate_keyboard(texts: Texts) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=texts.duplicate_save, callback_data=SAVE_DUPLICATE),
+                InlineKeyboardButton(text=texts.duplicate_skip, callback_data=SKIP_DUPLICATE),
+            ]
+        ]
+    )
+
+
+async def _replace_question(callback: CallbackQuery, reply: str) -> None:
+    # Editing the question removes its buttons, so they cannot be pressed twice.
+    if isinstance(callback.message, Message):
+        await callback.message.edit_text(reply)
+    await callback.answer()

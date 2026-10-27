@@ -54,3 +54,22 @@ class ReceiptService(Protocol):
             Deleted receipt, or None if the user has no receipts.
         """
         ...
+
+    async def save_duplicate(self, user_id: int) -> Receipt | None:
+        """Save the receipt last rejected as a duplicate, after the user confirmed it.
+
+        Args:
+            user_id: Telegram user identifier.
+
+        Returns:
+            Saved receipt, or None if there is no pending duplicate.
+        """
+        ...
+
+    def discard_duplicate(self, user_id: int) -> None:
+        """Forget the receipt last rejected as a duplicate.
+
+        Args:
+            user_id: Telegram user identifier.
+        """
+        ...

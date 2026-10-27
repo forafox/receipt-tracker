@@ -61,8 +61,16 @@ class FakeStorage:
     def __init__(self) -> None:
         self.saved: list[tuple[int, Receipt, datetime]] = []
 
-    def save(self, user_id: int, receipt: Receipt, purchased_at: datetime) -> bool:
-        if any(owner == user_id and saved == receipt for owner, saved, _ in self.saved):
+    def save(
+        self,
+        user_id: int,
+        receipt: Receipt,
+        purchased_at: datetime,
+        *,
+        allow_duplicate: bool = False,
+    ) -> bool:
+        is_duplicate = any(owner == user_id and saved == receipt for owner, saved, _ in self.saved)
+        if is_duplicate and not allow_duplicate:
             return False
         self.saved.append((user_id, receipt, purchased_at))
         return True
@@ -309,3 +317,44 @@ async def test_processing_time_of_each_step_is_logged(caplog: pytest.LogCaptureF
     assert record.getMessage().startswith("Processed receipt for user 7: ocr ")
     assert ", parse " in record.getMessage()
     assert ", save " in record.getMessage()
+
+
+DUPLICATE_TEXT = "ПЯТЁРОЧКА\n05.10.2026 18:20\nИТОГО 250,00"
+
+
+async def test_confirmed_duplicate_is_saved_again() -> None:
+    storage = FakeStorage()
+    pipeline = make_pipeline(DUPLICATE_TEXT, storage)
+    receipt = await pipeline.process_photo(1, b"image", RECEIVED_AT)
+    with pytest.raises(ReceiptAlreadySaved):
+        await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    saved = await pipeline.save_duplicate(1)
+
+    assert saved == receipt
+    assert len(storage.saved) == 2
+    assert await pipeline.save_duplicate(1) is None
+
+
+async def test_discarded_duplicate_cannot_be_saved() -> None:
+    storage = FakeStorage()
+    pipeline = make_pipeline(DUPLICATE_TEXT, storage)
+    await pipeline.process_photo(1, b"image", RECEIVED_AT)
+    with pytest.raises(ReceiptAlreadySaved):
+        await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    pipeline.discard_duplicate(1)
+
+    assert await pipeline.save_duplicate(1) is None
+    assert len(storage.saved) == 1
+
+
+async def test_pending_duplicate_belongs_to_its_user() -> None:
+    storage = FakeStorage()
+    pipeline = make_pipeline(DUPLICATE_TEXT, storage)
+    await pipeline.process_photo(1, b"image", RECEIVED_AT)
+    with pytest.raises(ReceiptAlreadySaved):
+        await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert await pipeline.save_duplicate(2) is None
+    assert await pipeline.save_duplicate(1) is not None

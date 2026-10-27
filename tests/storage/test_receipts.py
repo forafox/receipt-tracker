@@ -118,3 +118,13 @@ def test_deleted_receipt_can_be_saved_again(tmp_path: Path) -> None:
     storage.delete_last(1)
 
     assert storage.save(1, FULL_RECEIPT, OCTOBER) is True
+
+
+def test_allowed_duplicate_is_saved_and_does_not_block_later_receipts(tmp_path: Path) -> None:
+    storage = SqliteReceiptStorage(tmp_path / "receipts.sqlite")
+    storage.save(1, FULL_RECEIPT, OCTOBER)
+
+    assert storage.save(1, FULL_RECEIPT, OCTOBER, allow_duplicate=True) is True
+    assert storage.save(1, FULL_RECEIPT, OCTOBER, allow_duplicate=True) is True
+    assert storage.save(1, FULL_RECEIPT, OCTOBER) is False
+    assert len(storage.list_between(1, OCTOBER, NOVEMBER)) == 3
