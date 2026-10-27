@@ -25,13 +25,21 @@ CREATE UNIQUE INDEX receipts_user_fingerprint ON receipts (user_id, fingerprint)
 class ReceiptStorage(Protocol):
     """Persistent storage of users' receipts."""
 
-    def save(self, user_id: int, receipt: Receipt, purchased_at: datetime) -> bool:
+    def save(
+        self,
+        user_id: int,
+        receipt: Receipt,
+        purchased_at: datetime,
+        *,
+        allow_duplicate: bool = False,
+    ) -> bool:
         """Save a receipt unless the user already saved the same one.
 
         Args:
             user_id: Telegram user identifier.
             receipt: Parsed receipt.
             purchased_at: Timezone-aware time the receipt is counted at.
+            allow_duplicate: Save the receipt even if the same one is already saved.
 
         Returns:
             True if the receipt was saved, False if it is a duplicate.
@@ -91,7 +99,14 @@ class SqliteReceiptStorage:
             if "fingerprint" not in columns:
                 connection.executescript(FINGERPRINT_MIGRATION)
 
-    def save(self, user_id: int, receipt: Receipt, purchased_at: datetime) -> bool:
+    def save(
+        self,
+        user_id: int,
+        receipt: Receipt,
+        purchased_at: datetime,
+        *,
+        allow_duplicate: bool = False,
+    ) -> bool:
         """Save a receipt unless the user already saved the same one.
 
         Receipts are considered the same when their store, date and total match. Receipts
@@ -101,6 +116,8 @@ class SqliteReceiptStorage:
             user_id: Telegram user identifier.
             receipt: Parsed receipt.
             purchased_at: Timezone-aware time the receipt is counted at.
+            allow_duplicate: Save the receipt even if the same one is already saved. Such a
+                receipt gets no fingerprint, so it never blocks later receipts.
 
         Returns:
             True if the receipt was saved, False if it is a duplicate.
@@ -113,7 +130,7 @@ class SqliteReceiptStorage:
                     user_id,
                     int(purchased_at.timestamp()),
                     receipt.model_dump_json(),
-                    _fingerprint(receipt),
+                    None if allow_duplicate else _fingerprint(receipt),
                 ),
             )
         return cursor.rowcount == 1

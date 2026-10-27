@@ -50,6 +50,7 @@ async def main() -> None:
     pipeline = ReceiptPipeline(build_default_ocr_service(), storage, ZoneInfo(settings.timezone))
     dispatcher = Dispatcher(service=pipeline)
     dispatcher.message.middleware(LanguageMiddleware())
+    dispatcher.callback_query.middleware(LanguageMiddleware())
     dispatcher.include_router(router)
     await set_commands(bot)
     await dispatcher.start_polling(bot)

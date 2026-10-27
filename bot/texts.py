@@ -17,7 +17,12 @@ class Texts:
         unknown: Reply sent for unsupported messages.
         error: Reply sent when receipt processing fails.
         unreadable: Reply sent when nothing useful was found on a photo.
-        duplicate: Reply sent when the receipt was already saved.
+        duplicate: Question asked when the receipt looks already saved.
+        duplicate_save: Button that saves a suspected duplicate anyway.
+        duplicate_skip: Button that drops a suspected duplicate.
+        duplicate_saved: Heading of the reply after a duplicate was saved anyway.
+        duplicate_skipped: Reply after a suspected duplicate was dropped.
+        duplicate_expired: Reply when the suspected duplicate is no longer available.
         file_too_large: Reply sent when an image file is too large to download.
         recognition_unavailable: Reply sent when text recognition is temporarily failing.
         month_empty: Reply sent when no receipts were saved this month.
@@ -45,6 +50,11 @@ class Texts:
     error: str
     unreadable: str
     duplicate: str
+    duplicate_save: str
+    duplicate_skip: str
+    duplicate_saved: str
+    duplicate_skipped: str
+    duplicate_expired: str
     file_too_large: str
     recognition_unavailable: str
     month_empty: str
@@ -79,7 +89,12 @@ RU = Texts(
     unknown="Я понимаю только фото чеков. Список команд: /help",
     error="Не получилось обработать чек. Попробуйте ещё раз позже.",
     unreadable="Не удалось распознать чек. Сфотографируйте его ровно и при хорошем освещении.",
-    duplicate="Этот чек уже сохранён, повторно он не учитывается.",
+    duplicate="Похоже, этот чек уже сохранён. Сохранить его ещё раз?",
+    duplicate_save="Сохранить ещё раз",
+    duplicate_skip="Не сохранять",
+    duplicate_saved="Чек сохранён ещё раз:",
+    duplicate_skipped="Хорошо, повторно чек не сохранён.",
+    duplicate_expired="Этот чек уже не найти. Пришлите фото ещё раз.",
     file_too_large="Файл больше 20 МБ, такой бот скачать не может. Пришлите фото поменьше.",
     recognition_unavailable="Распознавание временно недоступно. Попробуйте через несколько минут.",
     month_empty="В этом месяце чеков пока нет.",
@@ -118,7 +133,12 @@ EN = Texts(
     unknown="I only understand receipt photos. Commands: /help",
     error="Could not process the receipt. Please try again later.",
     unreadable="Could not read the receipt. Take a straight photo in good light.",
-    duplicate="This receipt is already saved and will not be counted twice.",
+    duplicate="This receipt seems to be saved already. Save it again?",
+    duplicate_save="Save again",
+    duplicate_skip="Don't save",
+    duplicate_saved="Receipt saved again:",
+    duplicate_skipped="OK, the receipt was not saved again.",
+    duplicate_expired="This receipt is no longer available. Send the photo again.",
     file_too_large="The file is larger than 20 MB and cannot be downloaded. Send a smaller image.",
     recognition_unavailable="Recognition is temporarily unavailable. Try again in a few minutes.",
     month_empty="No receipts this month yet.",
