@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, tzinfo
 from decimal import Decimal
@@ -74,6 +75,7 @@ class ReceiptPipeline:
             ReceiptAlreadySaved: If the user has already saved the same receipt.
             RecognitionUnavailable: If the OCR engine itself failed.
         """
+        started = time.perf_counter()
         try:
             blocks = await asyncio.to_thread(self._recognizer.recognize_blocks, photo)
         except ImageDecodeError as error:
@@ -81,14 +83,33 @@ class ReceiptPipeline:
         except OcrError as error:
             logger.exception("OCR engine %s failed", self._recognizer.name)
             raise RecognitionUnavailable from error
+        recognized = time.perf_counter()
         receipt = parse_ocr_result(blocks, timezone=self._timezone)
+        parsed = time.perf_counter()
         if receipt.datetime is None and receipt.total is None:
+            logger.info(
+                "Unreadable receipt for user %s: ocr %.2fs, %d blocks",
+                user_id,
+                recognized - started,
+                len(blocks.blocks),
+            )
             raise ReceiptUnreadable
         purchased_at = receipt.datetime or received_at
         saved = await asyncio.to_thread(self._storage.save, user_id, receipt, purchased_at)
+        finished = time.perf_counter()
+        logger.info(
+            "Processed receipt for user %s: ocr %.2fs, parse %.2fs, save %.2fs, "
+            "items %d, warnings %s, duplicate %s",
+            user_id,
+            recognized - started,
+            parsed - recognized,
+            finished - parsed,
+            len(receipt.items),
+            receipt.warnings,
+            not saved,
+        )
         if not saved:
             raise ReceiptAlreadySaved
-        logger.info("Saved receipt for user %s, warnings: %s", user_id, receipt.warnings)
         return receipt
 
     async def monthly_summary(self, user_id: int, moment: datetime) -> MonthlySummary:

@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -295,3 +296,16 @@ async def test_receipt_without_date_sent_after_local_midnight_counts_in_new_mont
     assert november.month == date(2026, 11, 1)
     assert november.receipt_count == 1
     assert october.receipt_count == 0
+
+
+async def test_processing_time_of_each_step_is_logged(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger="pipeline.receipt")
+
+    await make_pipeline("ПЯТЁРОЧКА\n05.10.2026 18:20\nИТОГО 250,00").process_photo(
+        7, b"image", RECEIVED_AT
+    )
+
+    [record] = caplog.records
+    assert record.getMessage().startswith("Processed receipt for user 7: ocr ")
+    assert ", parse " in record.getMessage()
+    assert ", save " in record.getMessage()
