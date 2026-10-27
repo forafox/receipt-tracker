@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 router = Router()
 
+# Bot API refuses to send files larger than this to bots.
+MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024
+
 
 @router.message(CommandStart())
 async def handle_start(message: Message, texts: Texts) -> None:
@@ -111,8 +114,12 @@ async def handle_image_document(
         service: Receipt service that processes the downloaded image.
         texts: Localized response texts.
     """
-    if message.document:
-        await _process_image(message, bot, message.document, service, texts)
+    if not message.document:
+        return
+    if (message.document.file_size or 0) > MAX_DOWNLOAD_BYTES:
+        await message.answer(texts.file_too_large)
+        return
+    await _process_image(message, bot, message.document, service, texts)
 
 
 async def _process_image(

@@ -122,7 +122,7 @@ async def test_photo_reports_unreadable_receipt() -> None:
 
 async def test_image_document_is_processed_like_photo() -> None:
     message = make_message()
-    message.document = MagicMock()
+    message.document = MagicMock(file_size=1024)
     bot = make_bot(b"file")
     service = FakeService()
 
@@ -178,3 +178,16 @@ async def test_photo_reports_temporary_recognition_failure() -> None:
     await handle_photo(message, make_bot(b"image"), FakeService(error), EN)
 
     message.answer.assert_awaited_once_with(EN.recognition_unavailable)
+
+
+async def test_too_large_image_document_is_not_downloaded() -> None:
+    message = make_message()
+    message.document = MagicMock(file_size=25 * 1024 * 1024)
+    bot = make_bot(b"file")
+    service = FakeService()
+
+    await handle_image_document(message, bot, service, RU)
+
+    bot.download.assert_not_awaited()
+    assert service.received is None
+    message.answer.assert_awaited_once_with(RU.file_too_large)
