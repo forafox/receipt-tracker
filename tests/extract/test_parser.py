@@ -73,6 +73,19 @@ def test_merchant_can_follow_more_than_ten_fiscal_header_lines() -> None:
     assert receipt.warnings == []
 
 
+def test_timestamp_with_ocr_punctuation_does_not_become_another_merchant() -> None:
+    receipt = parse_receipt(
+        "МАГАЗИН\nДата: .05.10.2026 18:20\nХЛЕБ 50.00\nИТОГО 50.00",
+        timezone=MOSCOW_TIMEZONE,
+    )
+
+    assert receipt.store == "МАГАЗИН"
+    assert receipt.datetime == datetime(2026, 10, 5, 18, 20, tzinfo=MOSCOW_TIMEZONE)
+    assert receipt.items == [Item(name="ХЛЕБ", sum=Decimal("50.00"))]
+    assert receipt.total == Decimal("50.00")
+    assert receipt.warnings == []
+
+
 def test_datetime_with_seconds_is_supported() -> None:
     receipt = parse_receipt(
         "МАГНИТ\nДата: 05.10.2026 15:41:27\nИТОГ 10,00",
@@ -136,10 +149,20 @@ def test_total_extraction_continues_after_unusable_bottom_line() -> None:
     assert receipt.total == Decimal("200.00")
 
 
-def test_trailing_amount_is_preferred_on_total_line() -> None:
-    receipt = parse_receipt("ИТОГО НДС 20% 144,98", timezone=MOSCOW_TIMEZONE)
+@pytest.mark.parametrize("line", ["ИТОГО НДС 20% 144,98", "ИТОГО НДС 20% 24,16 144,98"])
+def test_trailing_amount_is_preferred_on_total_line(line: str) -> None:
+    receipt = parse_receipt(line, timezone=MOSCOW_TIMEZONE)
 
     assert receipt.total == Decimal("144.98")
+
+
+@pytest.mark.parametrize("amount", ["--12.99", "12.999"])
+def test_malformed_total_amount_is_not_partially_accepted(amount: str) -> None:
+    receipt = parse_receipt(f"МАГАЗИН\n05.10.2026 18:20\nИТОГО {amount}", timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.total is None
+    assert receipt.items == []
+    assert receipt.warnings == ["total_not_found"]
 
 
 def test_product_prices_are_not_used_as_total() -> None:

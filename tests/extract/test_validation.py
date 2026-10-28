@@ -182,7 +182,31 @@ def test_unresolved_candidates_prevent_definitive_total_warnings(
 def test_summaries_and_unclear_boundaries_disable_total_reconciliation(
     ocr: bool, body: str
 ) -> None:
-    assert _parse(HEADER + body, ocr=ocr).warnings == []
+    receipt = _parse(HEADER + body, ocr=ocr)
+
+    assert receipt.items == [Item(name="КОФЕ", sum=Decimal("300.00"))]
+    assert receipt.total == Decimal("250.00")
+    assert receipt.warnings == []
+
+
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+@pytest.mark.parametrize(
+    ("summary", "total"),
+    [
+        ("СКИДКА −50.00", "250.00"),
+        ("ОКРУГЛЕНИЕ -0.01", "299.99"),
+        ("НАЦЕНКА 50.00", "350.00"),
+        ("СПИСАНО БОНУСОВ 50.00", "250.00"),
+    ],
+)
+def test_adjustment_summaries_before_total_are_not_purchased_items(
+    ocr: bool, summary: str, total: str
+) -> None:
+    receipt = _parse(HEADER + f"КОФЕ 300.00\n{summary}\nИТОГО {total}", ocr=ocr)
+
+    assert receipt.items == [Item(name="КОФЕ", sum=Decimal("300.00"))]
+    assert receipt.total == Decimal(total)
+    assert receipt.warnings == []
 
 
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])

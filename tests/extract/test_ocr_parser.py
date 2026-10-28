@@ -195,6 +195,59 @@ def test_bare_amount_requires_nearby_description_to_its_left(
     assert receipt.warnings == ["total_not_found", *([] if expected else ["items_incomplete"])]
 
 
+def test_nameless_quantity_row_outside_description_column_is_not_associated() -> None:
+    result = _result(
+        [
+            _block("СЫР", 10, 60),
+            _block("1 x 179.90 179.90", 210, 80, 190),
+            _block("ХЛЕБ", 10, 110),
+            _block("50.00", 210, 110, 60),
+        ],
+        total="50.00",
+    )
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [Item(name="ХЛЕБ", sum=Decimal("50.00"))]
+    assert receipt.total == Decimal("50.00")
+    assert receipt.warnings == ["items_incomplete"]
+
+
+def test_unaligned_descriptions_are_not_merged_for_a_bare_amount() -> None:
+    result = _result(
+        [
+            _block("МОЛОКО", 10, 60),
+            _block("СЫР", 150, 80),
+            _block("179.90", 300, 100, 60),
+        ],
+        total="179.90",
+    )
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [Item(name="СЫР", sum=Decimal("179.90"))]
+    assert receipt.total == Decimal("179.90")
+    assert receipt.warnings == ["items_incomplete"]
+
+
+@pytest.mark.parametrize("quantity", ["-2", "- 2", "−2", "− 2"])
+def test_negative_named_quantity_is_not_reinterpreted_as_positive(quantity: str) -> None:
+    result = _result(
+        [
+            _block(f"МОЛОКО {quantity} x 50.00 -100.00", 10, 60, 300),
+            _block("ХЛЕБ", 10, 90),
+            _block("50.00", 210, 90, 60),
+        ],
+        total="-50.00",
+    )
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [Item(name="ХЛЕБ", sum=Decimal("50.00"))]
+    assert receipt.total == Decimal("-50.00")
+    assert receipt.warnings == ["items_incomplete"]
+
+
 @pytest.mark.parametrize(
     "unsupported",
     [
