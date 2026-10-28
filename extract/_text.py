@@ -14,7 +14,10 @@ SERVICE_LINE_PREFIXES = (
     "кассир",
 )
 _DATETIME_PATTERN = re.compile(r"(?<!\d)(\d{2}\.\d{2}\.\d{4}[ \t]+\d{2}:\d{2}(?::\d{2})?)(?![:\d])")
-_AMOUNT_PATTERN = re.compile(r"(?<![\d.,])(?:\d{1,3}(?:[ \u00a0]+\d{3})+|\d+)[,.]\d{2}(?!\d)")
+_AMOUNT_PATTERN = re.compile(
+    r"(?<![\d.,+\-−])(?:[+\-−][ \u00a0]*)?"
+    r"(?:\d{1,3}(?:[ \u00a0]+\d{3})+|\d+)[,.]\d{2}(?!\d)"
+)
 _TOTAL_LABEL_PATTERN = re.compile(r"(?:(?:всего\s+)?к\s+оплате|итого|итог)\b", re.IGNORECASE)
 
 
@@ -46,5 +49,5 @@ def _is_total_line(line: str) -> bool:
 
 
 def _parse_decimal(value: str) -> Decimal:
-    normalized = value.replace(" ", "").replace("\u00a0", "").replace(",", ".")
+    normalized = value.replace(" ", "").replace("\u00a0", "").replace(",", ".").replace("−", "-")
     return Decimal(normalized)
