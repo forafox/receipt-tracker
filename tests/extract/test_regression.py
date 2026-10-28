@@ -32,6 +32,59 @@ def _make_ocr(*fragments: tuple[str, int, int, int], shuffled: bool = False) -> 
 
 
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+def test_ambiguous_header_keeps_store_unknown(ocr: bool) -> None:
+    text = "ДОБРО ПОЖАЛОВАТЬ\nМАГАЗИН У РЕКИ\n05.10.2026 18:20\nМОЛОКО 100.00\nИТОГО 100.00"
+    result = _make_ocr(
+        ("ДОБРО ПОЖАЛОВАТЬ", 10, 10, 220),
+        ("МАГАЗИН У РЕКИ", 10, 30, 200),
+        ("05.10.2026 18:20", 10, 50, 180),
+        ("МОЛОКО", 10, 80, 100),
+        ("100.00", 275, 80, 335),
+        ("ИТОГО 100.00", 10, 110, 180),
+        shuffled=True,
+    )
+    actual = (
+        parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+        if ocr
+        else parse_receipt(text, timezone=MOSCOW_TIMEZONE)
+    )
+
+    assert actual == Receipt(
+        store=None,
+        datetime=datetime(2026, 10, 5, 18, 20, tzinfo=MOSCOW_TIMEZONE),
+        total=Decimal("100.00"),
+        items=[Item(name="МОЛОКО", sum=Decimal("100.00"))],
+        warnings=["store_not_found"],
+    )
+
+
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+@pytest.mark.parametrize("date_line", ["05.10 18:20", "Дата: 05.10.2026"])
+def test_incomplete_date_is_not_completed_from_current_time(ocr: bool, date_line: str) -> None:
+    text = f"МАГАЗИН\n{date_line}\nХЛЕБ 50.00\nИТОГО 50.00"
+    result = _make_ocr(
+        ("МАГАЗИН", 10, 10, 110),
+        (date_line, 10, 30, 200),
+        ("ХЛЕБ", 10, 60, 100),
+        ("50.00", 275, 60, 335),
+        ("ИТОГО 50.00", 10, 90, 180),
+    )
+    actual = (
+        parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+        if ocr
+        else parse_receipt(text, timezone=MOSCOW_TIMEZONE)
+    )
+
+    assert actual == Receipt(
+        store="МАГАЗИН",
+        datetime=None,
+        total=Decimal("50.00"),
+        items=[Item(name="ХЛЕБ", sum=Decimal("50.00"))],
+        warnings=["datetime_not_found"],
+    )
+
+
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
 @pytest.mark.parametrize("amount", ["-100.00", "- 100,00", "−100.00"])
 def test_refund_preserves_negative_item_and_final_total(ocr: bool, amount: str) -> None:
     text = (

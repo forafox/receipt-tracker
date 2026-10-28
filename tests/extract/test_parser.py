@@ -54,6 +54,25 @@ def test_store_preserves_cleaned_original_line() -> None:
     assert receipt.store == "Семейная пекарня №7"
 
 
+def test_amount_bearing_product_is_not_used_as_merchant() -> None:
+    receipt = parse_receipt("05.10.2026 18:20\nХЛЕБ 50.00\nИТОГО 50.00", timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.store is None
+    assert receipt.items == [Item(name="ХЛЕБ", sum=Decimal("50.00"))]
+    assert receipt.warnings == ["store_not_found"]
+
+
+def test_merchant_can_follow_more_than_ten_fiscal_header_lines() -> None:
+    metadata = [f"ФД {number}" for number in range(12)]
+    receipt = parse_receipt(
+        "\n".join([*metadata, "МАГАЗИН У РЕКИ", "05.10.2026 18:20", "ИТОГО 50.00"]),
+        timezone=MOSCOW_TIMEZONE,
+    )
+
+    assert receipt.store == "МАГАЗИН У РЕКИ"
+    assert receipt.warnings == []
+
+
 def test_datetime_with_seconds_is_supported() -> None:
     receipt = parse_receipt(
         "МАГНИТ\nДата: 05.10.2026 15:41:27\nИТОГ 10,00",
