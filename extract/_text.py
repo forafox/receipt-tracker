@@ -13,15 +13,9 @@ SERVICE_LINE_PREFIXES = (
     "чек",
     "кассир",
 )
-TOTAL_LABEL_PATTERNS = (
-    r"\bк\s+оплате\b",
-    r"\bитого\b",
-    r"\bитог\b",
-)
-
 _DATETIME_PATTERN = re.compile(r"(?<!\d)(\d{2}\.\d{2}\.\d{4}[ \t]+\d{2}:\d{2}(?::\d{2})?)(?![:\d])")
 _AMOUNT_PATTERN = re.compile(r"(?<![\d.,])(?:\d{1,3}(?:[ \u00a0]+\d{3})+|\d+)[,.]\d{2}(?!\d)")
-_TOTAL_LABEL_REGEXES = tuple(re.compile(pattern, re.IGNORECASE) for pattern in TOTAL_LABEL_PATTERNS)
+_TOTAL_LABEL_PATTERN = re.compile(r"(?:(?:всего\s+)?к\s+оплате|итого|итог)\b", re.IGNORECASE)
 
 
 def _has_service_prefix(line: str, prefix: str) -> bool:
@@ -35,7 +29,7 @@ def _has_service_prefix(line: str, prefix: str) -> bool:
 
 def _extract_total(lines: list[str]) -> Decimal | None:
     for line in reversed(lines):
-        if not _contains_total_label(line):
+        if not _is_total_line(line):
             continue
 
         for match in reversed(list(_AMOUNT_PATTERN.finditer(line))):
@@ -46,8 +40,9 @@ def _extract_total(lines: list[str]) -> Decimal | None:
     return None
 
 
-def _contains_total_label(line: str) -> bool:
-    return any(pattern.search(line) for pattern in _TOTAL_LABEL_REGEXES)
+def _is_total_line(line: str) -> bool:
+    # An interior total word may belong to a product name.
+    return _TOTAL_LABEL_PATTERN.match(line.strip()) is not None
 
 
 def _parse_decimal(value: str) -> Decimal:

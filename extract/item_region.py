@@ -3,11 +3,10 @@ import re
 from extract._text import (
     _AMOUNT_PATTERN,
     _DATETIME_PATTERN,
-    _TOTAL_LABEL_REGEXES,
     SERVICE_LINE_PREFIXES,
-    _contains_total_label,
     _extract_total,
     _has_service_prefix,
+    _is_total_line,
 )
 
 _NUMBERED_SERVICE_PREFIXES = ("касса", "смена", "чек")
@@ -81,10 +80,6 @@ def _select_item_candidate_indices(lines: list[str], *, store: str | None) -> li
     return candidates
 
 
-def _is_total_line(line: str) -> bool:
-    return any(pattern.match(line) for pattern in _TOTAL_LABEL_REGEXES)
-
-
 def _can_reconcile_item_region(lines: list[str], *, store: str | None) -> bool:
     """Require a clear total boundary without unrepresented monetary summaries.
 
@@ -95,16 +90,20 @@ def _can_reconcile_item_region(lines: list[str], *, store: str | None) -> bool:
     Returns:
         Whether structural cues permit reconciliation, subject to actual candidate coverage.
         Multiple total labels, early payment boundaries, adjustments and even tax summaries
-        conservatively disable the check. This cannot detect rows omitted entirely by OCR.
+        conservatively disable the check, as do unclassified monetary rows after the total.
+        This cannot detect rows omitted entirely by OCR.
     """
     cleaned = [line.strip() for line in lines if line.strip()]
-    totals = [index for index, line in enumerate(cleaned) if _contains_total_label(line)]
+    totals = [index for index, line in enumerate(cleaned) if _is_total_line(line)]
     if len(totals) != 1:
         return False
     total_index = totals[0]
-    if not _is_total_line(cleaned[total_index]) or _extract_total([cleaned[total_index]]) is None:
+    if _extract_total([cleaned[total_index]]) is None:
         return False
     if store is not None and _AMOUNT_PATTERN.search(store):
+        return False
+    footer_candidates = _select_item_candidate_lines(cleaned[total_index + 1 :], store=None)
+    if any(_AMOUNT_PATTERN.search(line) for line in footer_candidates):
         return False
     if any(
         _SUMMARY_PATTERN.fullmatch(line)

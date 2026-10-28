@@ -176,6 +176,7 @@ def test_unresolved_candidates_prevent_definitive_total_warnings(
         "КОФЕ 300.00\nКАРТОЙ 250.00\nХЛЕБ 50.00\nИТОГО 250.00",
         "КОФЕ 300.00\nИТОГО 300.00\nК ОПЛАТЕ 250.00",
         "КОФЕ 300.00\nИТОГО 250.00\nНЕРАСПОЗНАННЫЙ ИТОГ 200.00",
+        "КОФЕ 300.00\nИТОГО 250.00\nНЕРАСПОЗНАННАЯ СТРОКА 200.00",
     ],
 )
 def test_summaries_and_unclear_boundaries_disable_total_reconciliation(

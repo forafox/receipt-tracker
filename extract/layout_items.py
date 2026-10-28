@@ -20,13 +20,14 @@ _PERCENT_FRAGMENT = re.compile(r"\d+(?:[.,]\d+)?\s*%")
 def _extract_layout_items(lines: list[LayoutLine], *, store: str | None) -> tuple[list[Item], bool]:
     """Associate adjacent descriptions with explicit amounts, without deriving values.
 
-    Description fragments and named rows must align within one text height;
+    Description fragments must align within one text height;
     vertical gaps must be nonnegative and no larger than one text height. A
     nameless quantity row must start beneath the description, and a bare amount
     must lie to its right. Metadata and unsupported numeric rows break continuity.
     Overlapping blocks and multiple amounts without a multiplication label are skipped.
-    An aligned unpriced fragment can still resemble a separate product missing
-    its amount; this heuristic cannot resolve that ambiguity reliably.
+    Rows with their own name and amount never absorb preceding descriptions: an
+    unpriced fragment could be a separate product whose amount was lost by OCR.
+    Nameless amount rows still use nearby descriptions, which remains a heuristic.
 
     Args:
         lines: Receipt rows reconstructed from OCR geometry.
@@ -110,7 +111,7 @@ def _left_aligned(first: LayoutLine, second: LayoutLine) -> bool:
 
 
 def _complete_name(name: str, pending: list[LayoutLine], line: LayoutLine) -> str:
-    if not pending:
+    if not pending or _is_item_name(name):
         return name
     if name and not _left_aligned(pending[0], line):
         return name

@@ -149,8 +149,34 @@ def test_multiline_descriptions_and_quantity_rows_use_relative_geometry(scale: f
             price=Decimal("179.90"),
             sum=Decimal("179.90"),
         ),
-        Item(name="КОФЕ МОЛОТЫЙ АРАБИКА", sum=Decimal("250.00")),
+        # A named, priced row cannot prove that the preceding fragment belongs to it.
+        Item(name="АРАБИКА", sum=Decimal("250.00")),
     ]
+
+
+@pytest.mark.parametrize("expression", ["50.00", "1 x 50.00 50.00"])
+def test_complete_named_item_does_not_absorb_a_preceding_unpriced_item(expression: str) -> None:
+    result = _result(
+        [
+            _block("МОЛОКО", 10, 60),
+            _block("ХЛЕБ", 10, 80),
+            _block(expression, 130, 80, 140),
+        ],
+        total="50.00",
+    )
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [
+        Item(
+            name="ХЛЕБ",
+            quantity=Decimal("1") if "x" in expression else None,
+            price=Decimal("50.00") if "x" in expression else None,
+            sum=Decimal("50.00"),
+        )
+    ]
+    assert receipt.total == Decimal("50.00")
+    assert receipt.warnings == []
 
 
 @pytest.mark.parametrize(
