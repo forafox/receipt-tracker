@@ -4,19 +4,20 @@ from datetime import datetime, tzinfo
 from common.contracts import Receipt
 from common.ocr import OcrResult
 from extract._text import (
+    _AMOUNT_PATTERN,
     _DATETIME_PATTERN,
-    SERVICE_LINE_PREFIXES,
     _extract_total,
-    _has_service_prefix,
     _is_total_line,
 )
-from extract.item_region import _can_reconcile_item_region, _select_item_candidate_lines
+from extract.item_region import (
+    _can_reconcile_item_region,
+    _is_metadata_line,
+    _select_item_candidate_lines,
+)
 from extract.items import _parse_simple_item_line
 from extract.layout import reconstruct_layout
 from extract.layout_items import _extract_layout_items
 from extract.validation import _validate_arithmetic
-
-STORE_HEADER_LINE_LIMIT = 10
 
 STORE_NOT_FOUND = "store_not_found"
 DATETIME_NOT_FOUND = "datetime_not_found"
@@ -98,21 +99,22 @@ def _parse_receipt_fields(text: str, lines: list[str], timezone: tzinfo) -> Rece
 
 
 def _extract_store(lines: list[str]) -> str | None:
-    for line in lines[:STORE_HEADER_LINE_LIMIT]:
+    # Only a unique header before a date or priced row is identifiable as a merchant.
+    candidates: list[str] = []
+    for line in lines:
+        if _DATETIME_PATTERN.search(line) or _is_total_line(line) or _AMOUNT_PATTERN.search(line):
+            break
         if _is_plausible_store_line(line):
-            return line
-    return None
+            candidates.append(line)
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _is_plausible_store_line(line: str) -> bool:
-    if _DATETIME_PATTERN.search(line) or _is_total_line(line):
+    if _is_metadata_line(line):
         return False
     if _NUMBER_ONLY_PATTERN.fullmatch(line):
         return False
 
-    folded_line = line.casefold()
-    if any(_has_service_prefix(folded_line, prefix) for prefix in SERVICE_LINE_PREFIXES):
-        return False
     return any(character.isalpha() for character in line)
 
 

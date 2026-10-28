@@ -193,10 +193,15 @@ def test_percentage_in_product_name_does_not_disable_total_validation(ocr: bool)
 
 
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
-def test_amount_in_identified_merchant_does_not_hide_an_unparsed_item(ocr: bool) -> None:
+def test_products_without_merchant_are_kept_and_reconciled(ocr: bool) -> None:
     receipt = _parse("КАПУЧИНО 250.00\nКРУАССАН 150.00\nИТОГО 399.00", ocr=ocr)
 
-    assert receipt.warnings == ["datetime_not_found"]
+    assert receipt.store is None
+    assert receipt.items == [
+        Item(name="КАПУЧИНО", sum=Decimal("250.00")),
+        Item(name="КРУАССАН", sum=Decimal("150.00")),
+    ]
+    assert receipt.warnings == ["store_not_found", "datetime_not_found", "items_total_mismatch"]
 
 
 def test_ocr_item_warnings_follow_missing_field_warnings_even_when_total_is_unavailable() -> None:
