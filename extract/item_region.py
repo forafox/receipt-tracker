@@ -120,6 +120,8 @@ def _can_reconcile_item_region(lines: list[str], *, store: str | None) -> bool:
 
 def _is_metadata_line(line: str) -> bool:
     folded_line = line.casefold()
+    if folded_line in ("возврат прихода", "возврат расхода"):
+        return True
     for prefix in _NUMBERED_SERVICE_PREFIXES:
         if _has_service_prefix(folded_line, prefix):
             suffix = folded_line[len(prefix) :].lstrip(" :=№#")

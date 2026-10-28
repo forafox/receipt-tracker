@@ -32,6 +32,40 @@ def _make_ocr(*fragments: tuple[str, int, int, int], shuffled: bool = False) -> 
 
 
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+@pytest.mark.parametrize("amount", ["-100.00", "- 100,00", "−100.00"])
+def test_refund_preserves_negative_item_and_final_total(ocr: bool, amount: str) -> None:
+    text = (
+        "МАГАЗИН\n05.10.2026 18:20\nВОЗВРАТ ПРИХОДА\n"
+        f"МОЛОКО {amount}\nИТОГ -120.00\nК ОПЛАТЕ {amount}\nКАРТОЙ {amount}"
+    )
+    result = _make_ocr(
+        ("МАГАЗИН", 10, 10, 110),
+        ("05.10.2026 18:20", 10, 30, 180),
+        ("ВОЗВРАТ ПРИХОДА", 10, 50, 200),
+        ("МОЛОКО", 10, 80, 100),
+        (amount, 255, 80, 335),
+        ("ИТОГ -120.00", 10, 110, 180),
+        ("К ОПЛАТЕ", 10, 130, 160),
+        (amount, 255, 130, 335),
+        (f"КАРТОЙ {amount}", 10, 150, 220),
+        shuffled=True,
+    )
+    actual = (
+        parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+        if ocr
+        else parse_receipt(text, timezone=MOSCOW_TIMEZONE)
+    )
+
+    assert actual == Receipt(
+        store="МАГАЗИН",
+        datetime=datetime(2026, 10, 5, 18, 20, tzinfo=MOSCOW_TIMEZONE),
+        total=Decimal("-100.00"),
+        items=[Item(name="МОЛОКО", sum=Decimal("-100.00"))],
+        warnings=[],
+    )
+
+
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
 @pytest.mark.parametrize("label", ["ВСЕГО К ОПЛАТЕ", "всего\t к\u00a0оплате:"])
 @pytest.mark.parametrize(
     ("amount", "warnings"), [("100,00", []), ("99,00", ["items_total_mismatch"])]

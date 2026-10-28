@@ -107,6 +107,7 @@ def test_simple_name_fragments_preserve_product_numbers_and_duplicate_items() ->
         ("2 * 50.00 = 100.00", "2", "50.00", "100.00"),
         ("0,532 кг × 799,90 425,55", "0.532", "799.90", "425.55"),
         ("0.25kg х 1 200.00 = 300.00", "0.25", "1200.00", "300.00"),
+        ("1 x -100,00 = -100,00", "1", "-100.00", "-100.00"),
     ],
 )
 def test_explicit_quantity_and_weight_in_an_entire_row_block(
