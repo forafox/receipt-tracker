@@ -11,8 +11,9 @@ from extract._text import (
 )
 from extract.item_region import (
     _can_reconcile_item_region,
+    _has_unresolved_item_candidates,
     _is_metadata_line,
-    _select_item_candidate_lines,
+    _select_item_candidate_indices,
 )
 from extract.items import _parse_simple_item_line
 from extract.layout import reconstruct_layout
@@ -22,6 +23,7 @@ from extract.validation import _validate_arithmetic
 STORE_NOT_FOUND = "store_not_found"
 DATETIME_NOT_FOUND = "datetime_not_found"
 TOTAL_NOT_FOUND = "total_not_found"
+ITEMS_INCOMPLETE = "items_incomplete"
 
 _NUMBER_ONLY_PATTERN = re.compile(r"[\d\s.,:+\-№#]+")
 
@@ -35,17 +37,21 @@ def parse_receipt(text: str, *, timezone: tzinfo) -> Receipt:
 
     Returns:
         Receipt containing extracted fields and non-fatal parsing warnings.
+        Skipped item candidates are reported as items_incomplete; Item sums are always known.
     """
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     receipt = _parse_receipt_fields(text, lines, timezone)
-    parsed_candidates = [
-        _parse_simple_item_line(line)
-        for line in _select_item_candidate_lines(lines, store=receipt.store)
-    ]
-    receipt.items = [item for item in parsed_candidates if item is not None]
+    parsed_candidates = {
+        index: _parse_simple_item_line(lines[index])
+        for index in _select_item_candidate_indices(lines, store=receipt.store)
+    }
+    receipt.items = [item for item in parsed_candidates.values() if item is not None]
+    covered_rows = {index for index, item in parsed_candidates.items() if item is not None}
+    if _has_unresolved_item_candidates(lines, set(parsed_candidates), covered_rows):
+        receipt.warnings.append(ITEMS_INCOMPLETE)
     _validate_arithmetic(
         receipt,
-        extraction_complete=all(item is not None for item in parsed_candidates)
+        extraction_complete=all(item is not None for item in parsed_candidates.values())
         and _can_reconcile_item_region(lines, store=receipt.store),
     )
     return receipt
@@ -68,7 +74,11 @@ def parse_ocr_result(result: OcrResult, *, timezone: tzinfo) -> Receipt:
     text = "\n".join(line.text for line in layout)
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     receipt = _parse_receipt_fields(text, lines, timezone)
-    receipt.items, extraction_complete = _extract_layout_items(layout, store=receipt.store)
+    receipt.items, extraction_complete, items_incomplete = _extract_layout_items(
+        layout, store=receipt.store
+    )
+    if items_incomplete:
+        receipt.warnings.append(ITEMS_INCOMPLETE)
     _validate_arithmetic(
         receipt,
         extraction_complete=extraction_complete

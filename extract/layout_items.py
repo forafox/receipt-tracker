@@ -2,7 +2,7 @@ import re
 
 from common.contracts import Item
 from extract._text import _AMOUNT_PATTERN, _parse_decimal
-from extract.item_region import _select_item_candidate_indices
+from extract.item_region import _has_unresolved_item_candidates, _select_item_candidate_indices
 from extract.items import _is_item_name, _parse_simple_item_line
 from extract.layout import LayoutLine
 
@@ -17,7 +17,9 @@ _NUMERIC_FRAGMENT = re.compile(r"[\d\s.,]+")
 _PERCENT_FRAGMENT = re.compile(r"\d+(?:[.,]\d+)?\s*%")
 
 
-def _extract_layout_items(lines: list[LayoutLine], *, store: str | None) -> tuple[list[Item], bool]:
+def _extract_layout_items(
+    lines: list[LayoutLine], *, store: str | None
+) -> tuple[list[Item], bool, bool]:
     """Associate adjacent descriptions with explicit amounts, without deriving values.
 
     Description fragments must align within one text height;
@@ -34,19 +36,22 @@ def _extract_layout_items(lines: list[LayoutLine], *, store: str | None) -> tupl
         store: Previously identified merchant header, if available.
 
     Returns:
-        Items in reading order and whether every candidate independently produced
-        a named item. Multiline associations conservatively leave completeness unproven.
+        Items in reading order, whether every candidate independently produced a named item,
+        and whether item candidates were skipped. Fully consumed multiline descriptions are
+        not skipped, but conservatively leave reconciliation completeness unproven.
         All values come from explicit text; weight quantities retain their printed numeric values.
     """
-    candidates = set(_select_item_candidate_indices([line.text for line in lines], store=store))
+    texts = [line.text for line in lines]
+    candidates = set(_select_item_candidate_indices(texts, store=store))
     standalone_rows: set[int] = set()
-    pending: list[LayoutLine] = []
+    covered_rows: set[int] = set()
+    pending: list[int] = []
     items: list[Item] = []
     for index, line in enumerate(lines):
         if index not in candidates or not _has_usable_geometry(line):
             pending.clear()
             continue
-        if pending and not _nearby(pending[-1], line):
+        if pending and not _nearby(lines[pending[-1]], line):
             pending.clear()
         text = line.text.strip()
         quantity_match = _QUANTITY_PATTERN.search(text)
@@ -56,7 +61,8 @@ def _extract_layout_items(lines: list[LayoutLine], *, store: str | None) -> tupl
                 pending.clear()
                 continue
             has_name = bool(name)
-            name = _complete_name(name, pending, line)
+            uses_pending = not _is_item_name(name)
+            name = _complete_name(name, [lines[row] for row in pending], line)
             quantity = _parse_decimal(quantity_match.group("quantity"))
             if _is_item_name(name) and quantity > 0:
                 items.append(
@@ -67,24 +73,32 @@ def _extract_layout_items(lines: list[LayoutLine], *, store: str | None) -> tupl
                         sum=_parse_decimal(quantity_match.group("total")),
                     )
                 )
+                covered_rows.add(index)
+                if uses_pending:
+                    covered_rows.update(pending)
                 if has_name and len(text.splitlines()) == 1:
                     standalone_rows.add(index)
         elif item := _simple_row_item(line):
-            item.name = _complete_name(item.name, pending, line)
             items.append(item)
+            covered_rows.add(index)
             standalone_rows.add(index)
         elif _AMOUNT_PATTERN.fullmatch(text):
-            if pending and line.x_min >= max(fragment.x_max for fragment in pending):
-                name = " ".join(fragment.text.strip() for fragment in pending)
+            if pending and line.x_min >= max(lines[row].x_max for row in pending):
+                name = " ".join(lines[row].text.strip() for row in pending)
                 if _is_item_name(name):
                     items.append(Item(name=name, sum=_parse_decimal(text)))
+                    covered_rows.update([*pending, index])
         elif _is_item_name(text) or _PERCENT_FRAGMENT.fullmatch(text):
-            if pending and not _left_aligned(pending[0], line):
+            if pending and not _left_aligned(lines[pending[0]], line):
                 pending.clear()
-            pending.append(line)
+            pending.append(index)
             continue
         pending.clear()
-    return items, candidates.issubset(standalone_rows)
+    return (
+        items,
+        candidates.issubset(standalone_rows),
+        _has_unresolved_item_candidates(texts, candidates, covered_rows),
+    )
 
 
 def _has_usable_geometry(line: LayoutLine) -> bool:
