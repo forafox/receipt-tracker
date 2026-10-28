@@ -32,6 +32,34 @@ def _make_ocr(*fragments: tuple[str, int, int, int], shuffled: bool = False) -> 
 
 
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+def test_unpriced_items_are_skipped_with_one_incomplete_warning(ocr: bool) -> None:
+    text = "МАГАЗИН\n05.10.2026 18:20\nМОЛОКО\nЯЙЦА\nХЛЕБ 50.00\nИТОГО 150.00"
+    result = _make_ocr(
+        ("МАГАЗИН", 10, 10, 110),
+        ("05.10.2026 18:20", 10, 30, 180),
+        ("МОЛОКО", 10, 60, 100),
+        ("ЯЙЦА", 10, 80, 100),
+        ("ХЛЕБ", 10, 100, 100),
+        ("50.00", 275, 100, 335),
+        ("ИТОГО 150.00", 10, 130, 180),
+        shuffled=True,
+    )
+    receipt = (
+        parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+        if ocr
+        else parse_receipt(text, timezone=MOSCOW_TIMEZONE)
+    )
+
+    assert receipt == Receipt(
+        store="МАГАЗИН",
+        datetime=datetime(2026, 10, 5, 18, 20, tzinfo=MOSCOW_TIMEZONE),
+        total=Decimal("150.00"),
+        items=[Item(name="ХЛЕБ", sum=Decimal("50.00"))],
+        warnings=["items_incomplete"],
+    )
+
+
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
 def test_ambiguous_header_keeps_store_unknown(ocr: bool) -> None:
     text = "ДОБРО ПОЖАЛОВАТЬ\nМАГАЗИН У РЕКИ\n05.10.2026 18:20\nМОЛОКО 100.00\nИТОГО 100.00"
     result = _make_ocr(
@@ -59,7 +87,9 @@ def test_ambiguous_header_keeps_store_unknown(ocr: bool) -> None:
 
 
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
-@pytest.mark.parametrize("date_line", ["05.10 18:20", "Дата: 05.10.2026"])
+@pytest.mark.parametrize(
+    "date_line", ["05.10 18:20", "Дата: 05.10.2026", "Дата: 05.10 18:20", "05.10.26 18:20"]
+)
 def test_incomplete_date_is_not_completed_from_current_time(ocr: bool, date_line: str) -> None:
     text = f"МАГАЗИН\n{date_line}\nХЛЕБ 50.00\nИТОГО 50.00"
     result = _make_ocr(
@@ -336,7 +366,7 @@ def test_ocr_partial_extraction_skips_unsupported_item_without_total_warning() -
             Item(name="МОЛОКО", sum=Decimal("100.00")),
             Item(name="ХЛЕБ", sum=Decimal("50.00")),
         ],
-        warnings=["datetime_not_found"],
+        warnings=["datetime_not_found", "items_incomplete"],
     )
 
 
@@ -461,7 +491,7 @@ def test_text_quantity_rows_are_skipped_without_inferring_missing_values() -> No
         datetime=datetime(2026, 10, 6, 8, 15, tzinfo=MOSCOW_TIMEZONE),
         total=Decimal("204.80"),
         items=[Item(name="ЧАЙ ЧЕРНЫЙ", sum=Decimal("45.00"))],
-        warnings=[],
+        warnings=["items_incomplete"],
     )
 
 
@@ -482,5 +512,5 @@ def test_text_partial_receipt_preserves_missing_field_warning_and_printed_total(
             Item(name="МОЛОКО", sum=Decimal("100.00")),
             Item(name="ХЛЕБ", sum=Decimal("50.00")),
         ],
-        warnings=["datetime_not_found"],
+        warnings=["datetime_not_found", "items_incomplete"],
     )

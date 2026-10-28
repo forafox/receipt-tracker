@@ -153,6 +153,7 @@ def test_multiline_descriptions_and_quantity_rows_use_relative_geometry(scale: f
         # A named, priced row cannot prove that the preceding fragment belongs to it.
         Item(name="АРАБИКА", sum=Decimal("250.00")),
     ]
+    assert receipt.warnings == ["total_not_found", "items_incomplete"]
 
 
 @pytest.mark.parametrize("expression", ["50.00", "1 x 50.00 50.00"])
@@ -177,7 +178,7 @@ def test_complete_named_item_does_not_absorb_a_preceding_unpriced_item(expressio
         )
     ]
     assert receipt.total == Decimal("50.00")
-    assert receipt.warnings == []
+    assert receipt.warnings == ["items_incomplete"]
 
 
 @pytest.mark.parametrize(
@@ -191,6 +192,7 @@ def test_bare_amount_requires_nearby_description_to_its_left(
     receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
 
     assert receipt.items == ([Item(name="ХЛЕБ", sum=Decimal("50.00"))] if expected else [])
+    assert receipt.warnings == ["total_not_found", *([] if expected else ["items_incomplete"])]
 
 
 @pytest.mark.parametrize(
@@ -215,9 +217,9 @@ def test_incomplete_or_ambiguous_values_are_not_inferred_or_carried_forward(
         ]
     )
 
-    assert parse_ocr_result(result, timezone=MOSCOW_TIMEZONE).items == [
-        Item(name="ХЛЕБ", sum=Decimal("50.00"))
-    ]
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+    assert receipt.items == [Item(name="ХЛЕБ", sum=Decimal("50.00"))]
+    assert receipt.warnings == ["total_not_found", "items_incomplete"]
 
 
 def test_metadata_breaks_multiline_association_and_payment_ends_item_region() -> None:
@@ -237,7 +239,7 @@ def test_metadata_breaks_multiline_association_and_payment_ends_item_region() ->
     receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
 
     assert receipt.items == [Item(name="ХЛЕБ", sum=Decimal("50.00"))]
-    assert receipt.warnings == ["total_not_found"]
+    assert receipt.warnings == ["total_not_found", "items_incomplete"]
 
 
 def test_overlapping_or_competing_numeric_blocks_are_skipped() -> None:

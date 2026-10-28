@@ -163,7 +163,7 @@ def test_unresolved_candidates_prevent_definitive_total_warnings(
 
     assert [item.sum for item in receipt.items] == [Decimal("100.00"), Decimal("50.00")]
     assert receipt.total == Decimal("250.00")
-    assert receipt.warnings == []
+    assert receipt.warnings == ["items_incomplete"]
 
 
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
@@ -193,6 +193,15 @@ def test_percentage_in_product_name_does_not_disable_total_validation(ocr: bool)
 
 
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+@pytest.mark.parametrize("operation", ["ПРИХОД", "ВОЗВРАТ ПРИХОДА"])
+def test_operation_labels_do_not_count_as_unparsed_items(ocr: bool, operation: str) -> None:
+    receipt = _parse(HEADER + f"{operation}\nХЛЕБ 50.00\nИТОГО 50.00", ocr=ocr)
+
+    assert receipt.items == [Item(name="ХЛЕБ", sum=Decimal("50.00"))]
+    assert receipt.warnings == []
+
+
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
 def test_products_without_merchant_are_kept_and_reconciled(ocr: bool) -> None:
     receipt = _parse("КАПУЧИНО 250.00\nКРУАССАН 150.00\nИТОГО 399.00", ocr=ocr)
 
@@ -212,6 +221,24 @@ def test_ocr_item_warnings_follow_missing_field_warnings_even_when_total_is_unav
         "total_not_found",
         "item_amount_mismatch",
     ]
+
+
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+def test_incomplete_warning_follows_missing_fields(ocr: bool) -> None:
+    receipt = _parse("Лавка\nХЛЕБ 50.00\nСЫР", ocr=ocr)
+
+    assert receipt.items == [Item(name="ХЛЕБ", sum=Decimal("50.00"))]
+    assert receipt.warnings == ["datetime_not_found", "total_not_found", "items_incomplete"]
+
+
+def test_incomplete_warning_precedes_item_arithmetic_and_disables_total_check() -> None:
+    receipt = _parse(HEADER + "МОЛОКО 2 x 89.99 179.97\nСЫР\nИТОГО 100.00", ocr=True)
+
+    assert receipt.items == [
+        Item(name="МОЛОКО", quantity=Decimal("2"), price=Decimal("89.99"), sum=Decimal("179.97"))
+    ]
+    assert receipt.total == Decimal("100.00")
+    assert receipt.warnings == ["items_incomplete", "item_amount_mismatch"]
 
 
 def test_multiline_ocr_items_get_item_checks_but_not_definitive_total_comparison() -> None:

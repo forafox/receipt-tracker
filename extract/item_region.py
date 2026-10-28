@@ -31,6 +31,7 @@ _ADJUSTMENT_PREFIXES = (
     "возврат",
 )
 _DATE_OR_TIME_PATTERN = re.compile(r"(?:\d{2}\.\d{2}\.\d{4}|\d{2}:\d{2}(?::\d{2})?)")
+_PARTIAL_DATETIME_PATTERN = re.compile(r"\d{2}\.\d{2}(?:\.\d{2})?[ \t]+\d{2}:\d{2}(?::\d{2})?")
 _SUMMARY_PATTERN = re.compile(
     r"(?:скидка|сумма скидки|ндс|сумма ндс|без ндс)"
     r"(?:\s*[:=]?\s*[\d\s.,:%=+\-]+(?:\s*руб\.?)?)?",
@@ -80,6 +81,22 @@ def _select_item_candidate_indices(lines: list[str], *, store: str | None) -> li
     return candidates
 
 
+def _has_unresolved_item_candidates(
+    lines: list[str], candidates: set[int], covered_rows: set[int]
+) -> bool:
+    # Unclassified headers alone do not prove that purchased items were lost.
+    in_item_region = False
+    for index, line in enumerate(lines):
+        if _DATETIME_PATTERN.search(line) or _is_date_or_time_line(line) or index in covered_rows:
+            in_item_region = True
+        elif index in candidates and (
+            in_item_region
+            or (_AMOUNT_PATTERN.search(line) and any(character.isalpha() for character in line))
+        ):
+            return True
+    return False
+
+
 def _can_reconcile_item_region(lines: list[str], *, store: str | None) -> bool:
     """Require a clear total boundary without unrepresented monetary summaries.
 
@@ -120,7 +137,7 @@ def _can_reconcile_item_region(lines: list[str], *, store: str | None) -> bool:
 
 def _is_metadata_line(line: str) -> bool:
     folded_line = line.casefold()
-    if folded_line in ("возврат прихода", "возврат расхода"):
+    if folded_line in ("приход", "расход", "возврат прихода", "возврат расхода"):
         return True
     for prefix in _NUMBERED_SERVICE_PREFIXES:
         if _has_service_prefix(folded_line, prefix):
@@ -133,8 +150,17 @@ def _is_metadata_line(line: str) -> bool:
         return True
     if _is_total_line(line) or _SUMMARY_PATTERN.fullmatch(line):
         return True
+    return _is_date_or_time_line(line)
+
+
+def _is_date_or_time_line(line: str) -> bool:
+    folded_line = line.casefold()
     for prefix in ("дата", "время"):
         if _has_service_prefix(folded_line, prefix):
             line = line[len(prefix) :].lstrip(" :")
             break
-    return bool(_DATETIME_PATTERN.fullmatch(line) or _DATE_OR_TIME_PATTERN.fullmatch(line))
+    return bool(
+        _DATETIME_PATTERN.fullmatch(line)
+        or _DATE_OR_TIME_PATTERN.fullmatch(line)
+        or _PARTIAL_DATETIME_PATTERN.fullmatch(line)
+    )

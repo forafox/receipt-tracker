@@ -88,4 +88,4 @@ def test_public_parser_skips_multiline_items_and_keeps_later_simple_items() -> N
     assert receipt.total == Decimal("229.90")
     # Without a date or fiscal separator, the merchant and unpriced description are ambiguous.
     assert receipt.store is None
-    assert receipt.warnings == ["store_not_found", "datetime_not_found"]
+    assert receipt.warnings == ["store_not_found", "datetime_not_found", "items_incomplete"]
