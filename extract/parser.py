@@ -6,9 +6,9 @@ from common.ocr import OcrResult
 from extract._text import (
     _DATETIME_PATTERN,
     SERVICE_LINE_PREFIXES,
-    _contains_total_label,
     _extract_total,
     _has_service_prefix,
+    _is_total_line,
 )
 from extract.item_region import _can_reconcile_item_region, _select_item_candidate_lines
 from extract.items import _parse_simple_item_line
@@ -105,7 +105,7 @@ def _extract_store(lines: list[str]) -> str | None:
 
 
 def _is_plausible_store_line(line: str) -> bool:
-    if _DATETIME_PATTERN.search(line) or _contains_total_label(line):
+    if _DATETIME_PATTERN.search(line) or _is_total_line(line):
         return False
     if _NUMBER_ONLY_PATTERN.fullmatch(line):
         return False

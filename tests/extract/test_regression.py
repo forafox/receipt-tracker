@@ -31,6 +31,73 @@ def _make_ocr(*fragments: tuple[str, int, int, int], shuffled: bool = False) -> 
     return result
 
 
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+@pytest.mark.parametrize("label", ["ВСЕГО К ОПЛАТЕ", "всего\t к\u00a0оплате:"])
+@pytest.mark.parametrize(
+    ("amount", "warnings"), [("100,00", []), ("99,00", ["items_total_mismatch"])]
+)
+def test_total_label_is_shared_by_fields_item_region_and_validation(
+    ocr: bool, label: str, amount: str, warnings: list[str]
+) -> None:
+    text = f"МАГАЗИН\nМОЛОКО 100.00\n{label} {amount}"
+    result = _make_ocr(
+        ("МАГАЗИН", 10, 10, 110),
+        ("МОЛОКО", 10, 40, 100),
+        ("100.00", 275, 40, 335),
+        (label, 10, 70, 210),
+        (amount, 275, 70, 335),
+        shuffled=True,
+    )
+    expected = Receipt(
+        store="МАГАЗИН",
+        total=Decimal(amount.replace(",", ".")),
+        items=[Item(name="МОЛОКО", sum=Decimal("100.00"))],
+        warnings=["datetime_not_found", *warnings],
+    )
+
+    actual = (
+        parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+        if ocr
+        else parse_receipt(text, timezone=MOSCOW_TIMEZONE)
+    )
+    assert actual == expected
+
+
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+@pytest.mark.parametrize("total", [None, "89.99"])
+def test_total_word_inside_product_name_neither_supplies_nor_hides_a_total(
+    ocr: bool,
+    total: str | None,
+) -> None:
+    text = "МАГАЗИН\nНАПИТОК ИТОГО 90.00"
+    result = _make_ocr(
+        ("МАГАЗИН", 10, 10, 110),
+        ("НАПИТОК ИТОГО", 10, 40, 180),
+        ("90.00", 275, 40, 335),
+    )
+    if total is not None:
+        text += f"\nИТОГО {total}"
+        result.blocks.append(
+            TextBlock(text=f"ИТОГО {total}", bbox=[(10, 70), (335, 70), (335, 82), (10, 82)])
+        )
+    expected = Receipt(
+        store="МАГАЗИН",
+        total=Decimal(total) if total is not None else None,
+        items=[Item(name="НАПИТОК ИТОГО", sum=Decimal("90.00"))],
+        warnings=[
+            "datetime_not_found",
+            "items_total_mismatch" if total is not None else "total_not_found",
+        ],
+    )
+
+    actual = (
+        parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+        if ocr
+        else parse_receipt(text, timezone=MOSCOW_TIMEZONE)
+    )
+    assert actual == expected
+
+
 @pytest.mark.parametrize("shuffled", [False, True], ids=["ordered", "shuffled"])
 def test_ocr_simple_items_preserve_order_and_input(shuffled: bool) -> None:
     result = _make_ocr(
