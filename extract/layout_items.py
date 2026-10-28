@@ -7,7 +7,7 @@ from extract.items import _is_item_name, _parse_simple_item_line
 from extract.layout import LayoutLine
 
 _QUANTITY_PATTERN = re.compile(
-    rf"(?<![\w.,+\-])(?P<quantity>\d+(?:[.,]\d+)?)\s*"
+    rf"(?<![\w.,+\-−])(?P<quantity>\d+(?:[.,]\d+)?)\s*"
     rf"(?:кг|kg|г|g|шт\.?|л|l)?\s*[xх×*]\s*"
     rf"(?P<price>{_AMOUNT_PATTERN.pattern})(?:\s*=\s*|\s+)"
     rf"(?P<total>{_AMOUNT_PATTERN.pattern})$",

@@ -29,7 +29,7 @@ def _parse_simple_item_line(line: str) -> Item | None:
 
 
 def _is_item_name(name: str) -> bool:
-    if not any(character.isalpha() for character in name) or name.endswith(("-", "+")):
+    if not any(character.isalpha() for character in name) or name.endswith(("-", "+", "−")):
         return False
     if _MULTIPLICATION_PATTERN.search(name):
         return False
