@@ -139,6 +139,10 @@ text = service.recognize(image_bytes)  # plain text (совместим с pipel
 Добавлен тест, который запускает несколько потоков на первом вызове и проверяет, что движок
 создан ровно один раз. Вызовы распознавания при этом не сериализуются.
 
+Сценарий проверен также через `asyncio.to_thread` — именно так пайплайн вызывает OCR.
+Тест `test_concurrent_first_use_through_asyncio_to_thread_builds_once` подтверждает, что
+движок создаётся один раз и при таком запуске.
+
 ### Примеры работы
 
 Результат `ocr.tools.preview` на одном и том же чеке: зелёным — эталонные боксы из `dataset/`,
@@ -195,6 +199,13 @@ OCR_RUN_EASYOCR=1 uv run pytest -m slow
 - Добавлены тесты `tests/ocr/test_service.py`: делегирование движку, ленивое создание,
   совместимость с `OcrEngine` и `pipeline.TextRecognizer`.
 
+## Изменения в ветке `test/ocr-concurrent-first-use`
+
+- Добавлен тест `test_concurrent_first_use_through_asyncio_to_thread_builds_once`:
+  конкурентные первые вызовы через `asyncio.to_thread` (паттерн пайплайна) создают движок
+  ровно один раз.
+- Тест дополняет существующий потоковый тест и не меняет production-код.
+- `bot/` и общие контракты не затронуты.
 ## Изменения в ветке `docs/ocr-engine-lifecycle`
 
 - Зафиксировано правило владения OCR-движком: созданный сервисом движок живёт до завершения

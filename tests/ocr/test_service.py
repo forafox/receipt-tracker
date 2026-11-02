@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
 from pathlib import Path
@@ -108,6 +109,52 @@ def test_concurrent_first_use_builds_engine_once(monkeypatch: pytest.MonkeyPatch
     assert len(results) == worker_count
     assert all(result.blocks[0].text == "ИТОГО" for result in results)
     assert build_calls == 1
+
+
+async def test_concurrent_first_use_through_asyncio_to_thread_builds_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    build_calls = 0
+    build_entered = threading.Event()
+    release_build = threading.Event()
+
+    def fake_build(settings: OcrSettings) -> FakeEngine:
+        nonlocal build_calls
+        build_calls += 1
+        build_entered.set()
+        if not release_build.wait(timeout=5):
+            raise TimeoutError("engine build was not released")
+        return FakeEngine()
+
+    monkeypatch.setattr("ocr.service.build_ocr_engine", fake_build)
+    service = OcrService(OcrSettings(engine="fake"))
+    worker_count = 8
+    start = asyncio.Barrier(worker_count)
+
+    async def worker() -> OcrResult:
+        await start.wait()
+        return await asyncio.to_thread(service.process_receipt, b"image")
+
+    tasks = [asyncio.create_task(worker()) for _ in range(worker_count)]
+    results: list[OcrResult] = []
+    try:
+        for _ in range(500):
+            if build_entered.is_set():
+                break
+            await asyncio.sleep(0.01)
+        assert build_entered.is_set()
+        await asyncio.sleep(0.1)
+        release_build.set()
+        results = await asyncio.gather(*tasks)
+    finally:
+        release_build.set()
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    assert build_calls == 1
+    assert len(results) == worker_count
+    assert all(result.blocks[0].text == "ИТОГО" for result in results)
 
 
 def test_default_service_uses_default_settings(
