@@ -55,21 +55,23 @@ class ReceiptService(Protocol):
         """
         ...
 
-    async def save_duplicate(self, user_id: int) -> Receipt | None:
-        """Save the receipt last rejected as a duplicate, after the user confirmed it.
+    async def save_duplicate(self, user_id: int, pending_id: int) -> Receipt | None:
+        """Save a receipt rejected as a duplicate, after the user confirmed it.
 
         Args:
             user_id: Telegram user identifier.
+            pending_id: Identifier of the rejected receipt.
 
         Returns:
-            Saved receipt, or None if there is no pending duplicate.
+            Saved receipt, or None if this receipt is no longer pending.
         """
         ...
 
-    def discard_duplicate(self, user_id: int) -> None:
-        """Forget the receipt last rejected as a duplicate.
+    def discard_duplicate(self, user_id: int, pending_id: int) -> None:
+        """Forget a receipt rejected as a duplicate.
 
         Args:
             user_id: Telegram user identifier.
+            pending_id: Identifier of the rejected receipt.
         """
         ...
