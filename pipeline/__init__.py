@@ -1,6 +1,7 @@
 from pipeline.receipt import (
     MonthlySummary,
     ReceiptAlreadySaved,
+    ReceiptImageTooLarge,
     ReceiptPipeline,
     ReceiptUnreadable,
     RecognitionUnavailable,
@@ -9,6 +10,7 @@ from pipeline.receipt import (
 __all__ = [
     "MonthlySummary",
     "ReceiptAlreadySaved",
+    "ReceiptImageTooLarge",
     "ReceiptPipeline",
     "ReceiptUnreadable",
     "RecognitionUnavailable",

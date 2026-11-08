@@ -10,7 +10,7 @@ from itertools import count
 from common.contracts import Receipt
 from common.ocr import OcrEngine
 from extract import parse_ocr_result
-from ocr import ImageDecodeError, OcrError
+from ocr import ImageDecodeError, ImageTooLargeError, OcrError
 from storage import ReceiptStorage
 
 logger = logging.getLogger(__name__)
@@ -20,6 +20,10 @@ HISTORY_SIZE = 5
 
 class ReceiptUnreadable(Exception):
     """Raised when no useful receipt data can be extracted from a photo."""
+
+
+class ReceiptImageTooLarge(Exception):
+    """Raised when the photo is too large for text recognition."""
 
 
 class RecognitionUnavailable(Exception):
@@ -94,11 +98,14 @@ class ReceiptPipeline:
             ReceiptUnreadable: If the image cannot be decoded or neither the date nor the total
                 was found.
             ReceiptAlreadySaved: If the user has already saved the same receipt.
+            ReceiptImageTooLarge: If the photo exceeds the OCR size limits.
             RecognitionUnavailable: If the OCR engine itself failed.
         """
         started = time.perf_counter()
         try:
             blocks = await asyncio.to_thread(self._recognizer.recognize_blocks, photo)
+        except ImageTooLargeError as error:
+            raise ReceiptImageTooLarge from error
         except ImageDecodeError as error:
             raise ReceiptUnreadable from error
         except OcrError as error:
