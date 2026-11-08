@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, tzinfo
 
-from common.contracts import Receipt
+from common.contracts import Receipt, ReceiptWarning
 from common.ocr import OcrResult
 from extract._text import (
     _AMOUNT_PATTERN,
@@ -20,10 +20,10 @@ from extract.layout import reconstruct_layout
 from extract.layout_items import _extract_layout_items
 from extract.validation import _validate_arithmetic
 
-STORE_NOT_FOUND = "store_not_found"
-DATETIME_NOT_FOUND = "datetime_not_found"
-TOTAL_NOT_FOUND = "total_not_found"
-ITEMS_INCOMPLETE = "items_incomplete"
+STORE_NOT_FOUND = ReceiptWarning.STORE_NOT_FOUND
+DATETIME_NOT_FOUND = ReceiptWarning.DATETIME_NOT_FOUND
+TOTAL_NOT_FOUND = ReceiptWarning.TOTAL_NOT_FOUND
+ITEMS_INCOMPLETE = ReceiptWarning.ITEMS_INCOMPLETE
 
 _NUMBER_ONLY_PATTERN = re.compile(r"[\d\s.,:+\-№#]+")
 
