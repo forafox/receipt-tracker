@@ -1,11 +1,11 @@
 from decimal import ROUND_HALF_UP, Context, Decimal, localcontext
 
-from common.contracts import Receipt
+from common.contracts import Receipt, ReceiptWarning
 
 MONEY_QUANTUM = Decimal("0.01")
 MONEY_ROUNDING = ROUND_HALF_UP
-ITEM_AMOUNT_MISMATCH = "item_amount_mismatch"
-ITEMS_TOTAL_MISMATCH = "items_total_mismatch"
+ITEM_AMOUNT_MISMATCH = ReceiptWarning.ITEM_AMOUNT_MISMATCH
+ITEMS_TOTAL_MISMATCH = ReceiptWarning.ITEMS_TOTAL_MISMATCH
 
 
 def _validate_arithmetic(receipt: Receipt, *, extraction_complete: bool) -> None:
