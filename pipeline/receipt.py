@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, tzinfo
 from decimal import Decimal
 from functools import partial
+from itertools import count
 
 from common.contracts import Receipt
 from common.ocr import OcrEngine
@@ -26,7 +27,20 @@ class RecognitionUnavailable(Exception):
 
 
 class ReceiptAlreadySaved(Exception):
-    """Raised when the user has already saved the same receipt."""
+    """Raised when the user has already saved the same receipt.
+
+    Attributes:
+        pending_id: Identifier of the rejected receipt kept until the user decides on it.
+    """
+
+    def __init__(self, pending_id: int) -> None:
+        """Create the error.
+
+        Args:
+            pending_id: Identifier of the rejected receipt kept until the user decides on it.
+        """
+        super().__init__(pending_id)
+        self.pending_id = pending_id
 
 
 @dataclass(frozen=True)
@@ -62,7 +76,8 @@ class ReceiptPipeline:
         self._recognizer = recognizer
         self._storage = storage
         self._timezone = timezone
-        self._pending_duplicates: dict[int, tuple[Receipt, datetime]] = {}
+        self._pending_duplicates: dict[int, tuple[int, Receipt, datetime]] = {}
+        self._pending_ids = count(1)
 
     async def process_photo(self, user_id: int, photo: bytes, received_at: datetime) -> Receipt:
         """Recognize, parse and save a receipt photo.
@@ -115,20 +130,22 @@ class ReceiptPipeline:
             not saved,
         )
         if not saved:
-            self._pending_duplicates[user_id] = (receipt, purchased_at)
-            raise ReceiptAlreadySaved
+            pending_id = next(self._pending_ids)
+            self._pending_duplicates[user_id] = (pending_id, receipt, purchased_at)
+            raise ReceiptAlreadySaved(pending_id)
         return receipt
 
-    async def save_duplicate(self, user_id: int) -> Receipt | None:
-        """Save the receipt last rejected as a duplicate, after the user confirmed it.
+    async def save_duplicate(self, user_id: int, pending_id: int) -> Receipt | None:
+        """Save a receipt rejected as a duplicate, after the user confirmed it.
 
         Args:
             user_id: Telegram user identifier.
+            pending_id: Identifier from the ``ReceiptAlreadySaved`` error.
 
         Returns:
-            Saved receipt, or None if there is no pending duplicate.
+            Saved receipt, or None if this receipt is no longer pending.
         """
-        pending = self._pending_duplicates.pop(user_id, None)
+        pending = self._take_pending(user_id, pending_id)
         if pending is None:
             return None
         receipt, purchased_at = pending
@@ -137,13 +154,22 @@ class ReceiptPipeline:
         )
         return receipt
 
-    def discard_duplicate(self, user_id: int) -> None:
-        """Forget the receipt last rejected as a duplicate.
+    def discard_duplicate(self, user_id: int, pending_id: int) -> None:
+        """Forget a receipt rejected as a duplicate.
 
         Args:
             user_id: Telegram user identifier.
+            pending_id: Identifier from the ``ReceiptAlreadySaved`` error.
         """
-        self._pending_duplicates.pop(user_id, None)
+        self._take_pending(user_id, pending_id)
+
+    def _take_pending(self, user_id: int, pending_id: int) -> tuple[Receipt, datetime] | None:
+        # A newer duplicate replaces the older one, so an old question must not touch it.
+        pending = self._pending_duplicates.get(user_id)
+        if pending is None or pending[0] != pending_id:
+            return None
+        del self._pending_duplicates[user_id]
+        return pending[1], pending[2]
 
     async def monthly_summary(self, user_id: int, moment: datetime) -> MonthlySummary:
         """Sum a user's spending for the month containing a moment.

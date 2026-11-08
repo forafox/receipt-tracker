@@ -322,39 +322,54 @@ async def test_processing_time_of_each_step_is_logged(caplog: pytest.LogCaptureF
 DUPLICATE_TEXT = "ПЯТЁРОЧКА\n05.10.2026 18:20\nИТОГО 250,00"
 
 
+async def reject_duplicate(pipeline: ReceiptPipeline, user_id: int = 1) -> int:
+    with pytest.raises(ReceiptAlreadySaved) as raised:
+        await pipeline.process_photo(user_id, b"image", RECEIVED_AT)
+    return raised.value.pending_id
+
+
 async def test_confirmed_duplicate_is_saved_again() -> None:
     storage = FakeStorage()
     pipeline = make_pipeline(DUPLICATE_TEXT, storage)
     receipt = await pipeline.process_photo(1, b"image", RECEIVED_AT)
-    with pytest.raises(ReceiptAlreadySaved):
-        await pipeline.process_photo(1, b"image", RECEIVED_AT)
+    pending_id = await reject_duplicate(pipeline)
 
-    saved = await pipeline.save_duplicate(1)
+    saved = await pipeline.save_duplicate(1, pending_id)
 
     assert saved == receipt
     assert len(storage.saved) == 2
-    assert await pipeline.save_duplicate(1) is None
+    assert await pipeline.save_duplicate(1, pending_id) is None
 
 
 async def test_discarded_duplicate_cannot_be_saved() -> None:
     storage = FakeStorage()
     pipeline = make_pipeline(DUPLICATE_TEXT, storage)
     await pipeline.process_photo(1, b"image", RECEIVED_AT)
-    with pytest.raises(ReceiptAlreadySaved):
-        await pipeline.process_photo(1, b"image", RECEIVED_AT)
+    pending_id = await reject_duplicate(pipeline)
 
-    pipeline.discard_duplicate(1)
+    pipeline.discard_duplicate(1, pending_id)
 
-    assert await pipeline.save_duplicate(1) is None
+    assert await pipeline.save_duplicate(1, pending_id) is None
     assert len(storage.saved) == 1
 
 
 async def test_pending_duplicate_belongs_to_its_user() -> None:
+    pipeline = make_pipeline(DUPLICATE_TEXT)
+    await pipeline.process_photo(1, b"image", RECEIVED_AT)
+    pending_id = await reject_duplicate(pipeline)
+
+    assert await pipeline.save_duplicate(2, pending_id) is None
+    assert await pipeline.save_duplicate(1, pending_id) is not None
+
+
+async def test_old_question_does_not_touch_newer_duplicate() -> None:
     storage = FakeStorage()
     pipeline = make_pipeline(DUPLICATE_TEXT, storage)
     await pipeline.process_photo(1, b"image", RECEIVED_AT)
-    with pytest.raises(ReceiptAlreadySaved):
-        await pipeline.process_photo(1, b"image", RECEIVED_AT)
+    old_id = await reject_duplicate(pipeline)
+    new_id = await reject_duplicate(pipeline)
 
-    assert await pipeline.save_duplicate(2) is None
-    assert await pipeline.save_duplicate(1) is not None
+    assert await pipeline.save_duplicate(1, old_id) is None
+    pipeline.discard_duplicate(1, old_id)
+    assert await pipeline.save_duplicate(1, new_id) is not None
+    assert len(storage.saved) == 2

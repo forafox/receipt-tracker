@@ -3,6 +3,7 @@ from io import BytesIO
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandStart
+from aiogram.filters.callback_data import CallbackData
 from aiogram.types import (
     CallbackQuery,
     Downloadable,
@@ -23,8 +24,17 @@ router = Router()
 # Bot API refuses to send files larger than this to bots.
 MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024
 
-SAVE_DUPLICATE = "duplicate:save"
-SKIP_DUPLICATE = "duplicate:skip"
+
+class DuplicateDecision(CallbackData, prefix="duplicate"):
+    """Button data of the duplicate question.
+
+    Attributes:
+        save: Whether the user chose to save the receipt again.
+        pending_id: Identifier of the rejected receipt the question is about.
+    """
+
+    save: bool
+    pending_id: int
 
 
 @router.message(CommandStart())
@@ -146,8 +156,9 @@ async def _process_image(
             reply = format_receipt(receipt, texts)
         except ReceiptUnreadable:
             reply = texts.unreadable
-        except ReceiptAlreadySaved:
-            await message.answer(texts.duplicate, reply_markup=_duplicate_keyboard(texts))
+        except ReceiptAlreadySaved as duplicate:
+            keyboard = _duplicate_keyboard(texts, duplicate.pending_id)
+            await message.answer(texts.duplicate, reply_markup=keyboard)
             return
         except RecognitionUnavailable:
             reply = texts.recognition_unavailable
@@ -168,18 +179,22 @@ async def handle_unknown(message: Message, texts: Texts) -> None:
     await message.answer(texts.unknown)
 
 
-@router.callback_query(F.data == SAVE_DUPLICATE)
+@router.callback_query(DuplicateDecision.filter(F.save))
 async def handle_save_duplicate(
-    callback: CallbackQuery, service: ReceiptService, texts: Texts
+    callback: CallbackQuery,
+    callback_data: DuplicateDecision,
+    service: ReceiptService,
+    texts: Texts,
 ) -> None:
     """Save a suspected duplicate after the user confirmed it.
 
     Args:
         callback: Button press on the duplicate question.
+        callback_data: Decision and the receipt it applies to.
         service: Receipt service that keeps the pending duplicate.
         texts: Localized response texts.
     """
-    receipt = await service.save_duplicate(callback.from_user.id)
+    receipt = await service.save_duplicate(callback.from_user.id, callback_data.pending_id)
     if receipt is None:
         reply = texts.duplicate_expired
     else:
@@ -187,27 +202,33 @@ async def handle_save_duplicate(
     await _replace_question(callback, reply)
 
 
-@router.callback_query(F.data == SKIP_DUPLICATE)
+@router.callback_query(DuplicateDecision.filter(~F.save))
 async def handle_skip_duplicate(
-    callback: CallbackQuery, service: ReceiptService, texts: Texts
+    callback: CallbackQuery,
+    callback_data: DuplicateDecision,
+    service: ReceiptService,
+    texts: Texts,
 ) -> None:
     """Drop a suspected duplicate.
 
     Args:
         callback: Button press on the duplicate question.
+        callback_data: Decision and the receipt it applies to.
         service: Receipt service that keeps the pending duplicate.
         texts: Localized response texts.
     """
-    service.discard_duplicate(callback.from_user.id)
+    service.discard_duplicate(callback.from_user.id, callback_data.pending_id)
     await _replace_question(callback, texts.duplicate_skipped)
 
 
-def _duplicate_keyboard(texts: Texts) -> InlineKeyboardMarkup:
+def _duplicate_keyboard(texts: Texts, pending_id: int) -> InlineKeyboardMarkup:
+    save = DuplicateDecision(save=True, pending_id=pending_id).pack()
+    skip = DuplicateDecision(save=False, pending_id=pending_id).pack()
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text=texts.duplicate_save, callback_data=SAVE_DUPLICATE),
-                InlineKeyboardButton(text=texts.duplicate_skip, callback_data=SKIP_DUPLICATE),
+                InlineKeyboardButton(text=texts.duplicate_save, callback_data=save),
+                InlineKeyboardButton(text=texts.duplicate_skip, callback_data=skip),
             ]
         ]
     )
