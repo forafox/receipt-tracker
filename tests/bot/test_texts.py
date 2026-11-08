@@ -5,6 +5,7 @@ import pytest
 
 from bot.texts import (
     EN,
+    ITEMS_INCOMPLETE,
     ITEMS_TOTAL_MISMATCH,
     RU,
     format_history,
@@ -13,7 +14,7 @@ from bot.texts import (
     texts_for,
 )
 from common.contracts import Item, Receipt
-from extract import validation
+from extract import parser, validation
 from pipeline import MonthlySummary
 
 
@@ -70,5 +71,16 @@ def test_format_receipt_warns_when_items_do_not_add_up() -> None:
     assert format_receipt(receipt, EN).endswith(f"\n\n{EN.items_mismatch}")
 
 
-def test_mismatch_warning_matches_extraction_module() -> None:
+def test_warnings_match_extraction_module() -> None:
     assert ITEMS_TOTAL_MISMATCH == validation.ITEMS_TOTAL_MISMATCH
+    assert ITEMS_INCOMPLETE == parser.ITEMS_INCOMPLETE
+
+
+def test_format_receipt_warns_when_items_are_incomplete() -> None:
+    receipt = Receipt(
+        store="ЛЕНТА",
+        items=[Item(name="ХЛЕБ", sum=Decimal("45"))],
+        warnings=["items_incomplete"],
+    )
+
+    assert format_receipt(receipt, RU).endswith(f"\n\n{RU.items_incomplete}")
