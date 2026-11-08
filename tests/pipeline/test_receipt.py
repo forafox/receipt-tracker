@@ -9,10 +9,11 @@ import pytest
 
 from common.contracts import Item, Receipt
 from common.ocr import OcrResult, TextBlock
-from ocr import ImageDecodeError, OcrEngineUnavailableError
+from ocr import ImageDecodeError, ImageTooLargeError, OcrEngineUnavailableError
 from pipeline import (
     MonthlySummary,
     ReceiptAlreadySaved,
+    ReceiptImageTooLarge,
     ReceiptPipeline,
     ReceiptUnreadable,
     RecognitionUnavailable,
@@ -373,3 +374,14 @@ async def test_old_question_does_not_touch_newer_duplicate() -> None:
     pipeline.discard_duplicate(1, old_id)
     assert await pipeline.save_duplicate(1, new_id) is not None
     assert len(storage.saved) == 2
+
+
+async def test_oversized_image_is_reported_separately_from_unreadable() -> None:
+    storage = FakeStorage()
+    error = ImageTooLargeError("Image size 8000x8000 exceeds 25000000 pixels")
+    pipeline = ReceiptPipeline(FailingRecognizer(error), storage, MOSCOW_TIMEZONE)
+
+    with pytest.raises(ReceiptImageTooLarge):
+        await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert storage.saved == []

@@ -15,7 +15,12 @@ from aiogram.utils.chat_action import ChatActionSender
 
 from bot.service import ReceiptService
 from bot.texts import Texts, format_history, format_monthly_summary, format_receipt
-from pipeline import ReceiptAlreadySaved, ReceiptUnreadable, RecognitionUnavailable
+from pipeline import (
+    ReceiptAlreadySaved,
+    ReceiptImageTooLarge,
+    ReceiptUnreadable,
+    RecognitionUnavailable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +161,8 @@ async def _process_image(
             reply = format_receipt(receipt, texts)
         except ReceiptUnreadable:
             reply = texts.unreadable
+        except ReceiptImageTooLarge:
+            reply = texts.image_too_large
         except ReceiptAlreadySaved as duplicate:
             keyboard = _duplicate_keyboard(texts, duplicate.pending_id)
             await message.answer(texts.duplicate, reply_markup=keyboard)

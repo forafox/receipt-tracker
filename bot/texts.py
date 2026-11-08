@@ -27,6 +27,7 @@ class Texts:
         duplicate_skipped: Reply after a suspected duplicate was dropped.
         duplicate_expired: Reply when the suspected duplicate is no longer available.
         file_too_large: Reply sent when an image file is too large to download.
+        image_too_large: Reply sent when an image is too large to recognize.
         recognition_unavailable: Reply sent when text recognition is temporarily failing.
         month_empty: Reply sent when no receipts were saved this month.
         month_spending: Label for the monthly spending.
@@ -60,6 +61,7 @@ class Texts:
     duplicate_skipped: str
     duplicate_expired: str
     file_too_large: str
+    image_too_large: str
     recognition_unavailable: str
     month_empty: str
     month_spending: str
@@ -101,6 +103,7 @@ RU = Texts(
     duplicate_skipped="Хорошо, повторно чек не сохранён.",
     duplicate_expired="Этот чек уже не найти. Пришлите фото ещё раз.",
     file_too_large="Файл больше 20 МБ, такой бот скачать не может. Пришлите фото поменьше.",
+    image_too_large="Изображение слишком большое для распознавания. Уменьшите его и пришлите.",
     recognition_unavailable="Распознавание временно недоступно. Попробуйте через несколько минут.",
     month_empty="В этом месяце чеков пока нет.",
     month_spending="Расходы за",
@@ -146,6 +149,7 @@ EN = Texts(
     duplicate_skipped="OK, the receipt was not saved again.",
     duplicate_expired="This receipt is no longer available. Send the photo again.",
     file_too_large="The file is larger than 20 MB and cannot be downloaded. Send a smaller image.",
+    image_too_large="The image is too large to recognize. Resize it and send it again.",
     recognition_unavailable="Recognition is temporarily unavailable. Try again in a few minutes.",
     month_empty="No receipts this month yet.",
     month_spending="Spending for",

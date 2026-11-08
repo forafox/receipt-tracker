@@ -22,6 +22,7 @@ from common.contracts import Receipt
 from pipeline import (
     MonthlySummary,
     ReceiptAlreadySaved,
+    ReceiptImageTooLarge,
     ReceiptUnreadable,
     RecognitionUnavailable,
 )
@@ -259,3 +260,11 @@ async def test_skip_duplicate_forgets_receipt() -> None:
     assert service.decided_id == 7
     callback.message.edit_text.assert_awaited_once_with(RU.duplicate_skipped)
     callback.answer.assert_awaited_once()
+
+
+async def test_photo_reports_image_too_large_to_recognize() -> None:
+    message = make_message()
+
+    await handle_photo(message, make_bot(b"image"), FakeService(ReceiptImageTooLarge()), EN)
+
+    message.answer.assert_awaited_once_with(EN.image_too_large)
