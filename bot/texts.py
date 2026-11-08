@@ -3,8 +3,11 @@ from dataclasses import dataclass
 from common.contracts import Receipt
 from pipeline import MonthlySummary
 
-# Warning added by the extraction module when item sums do not add up to the total.
+# Warnings added by the extraction module.
+# Item sums do not add up to the total.
 ITEMS_TOTAL_MISMATCH = "items_total_mismatch"
+# Some lines looked like items but could not be parsed.
+ITEMS_INCOMPLETE = "items_incomplete"
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,7 @@ class Texts:
         total: Label for the receipt total.
         items: Heading of the purchased items list.
         items_mismatch: Note shown when item sums do not add up to the total.
+        items_incomplete: Note shown when some items could not be recognized.
         not_found: Placeholder for a field that was not recognized.
         help_command: Localized help command description.
         month_command: Localized monthly report command description.
@@ -69,6 +73,7 @@ class Texts:
     total: str
     items: str
     items_mismatch: str
+    items_incomplete: str
     not_found: str
     help_command: str
     month_command: str
@@ -112,6 +117,7 @@ RU = Texts(
         "Сумма покупок не сходится с итогом. "
         "Если чек распознан неверно, удалите его командой /undo."
     ),
+    items_incomplete="Часть покупок распознать не удалось, список может быть неполным.",
     not_found="не распознано",
     help_command="Справка",
     month_command="Расходы за месяц",
@@ -156,6 +162,7 @@ EN = Texts(
         "The items do not add up to the total. "
         "If the receipt was read incorrectly, delete it with /undo."
     ),
+    items_incomplete="Some items could not be recognized, the list may be incomplete.",
     not_found="not recognized",
     help_command="Help",
     month_command="Spending this month",
@@ -199,6 +206,8 @@ def format_receipt(receipt: Receipt, texts: Texts) -> str:
     if receipt.items:
         lines.append(f"\n{texts.items}:")
         lines.extend(f"- {item.name}: {item.sum:.2f}" for item in receipt.items)
+    if ITEMS_INCOMPLETE in receipt.warnings:
+        lines.append(f"\n{texts.items_incomplete}")
     if ITEMS_TOTAL_MISMATCH in receipt.warnings:
         lines.append(f"\n{texts.items_mismatch}")
     return "\n".join(lines)
