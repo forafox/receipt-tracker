@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Sequence
 from typing import Any
 
@@ -13,7 +14,8 @@ class EasyOcrEngine:
     """OCR engine backed by EasyOCR.
 
     The underlying ``easyocr.Reader`` is created lazily on the first recognition call, so
-    importing and constructing the engine never downloads model weights.
+    importing and constructing the engine never downloads model weights. Creation is
+    serialized, so concurrent first calls share one reader instance.
 
     Attributes:
         name: Engine identifier used by configuration and factories.
@@ -39,6 +41,7 @@ class EasyOcrEngine:
         self._gpu = gpu
         self._min_confidence = min_confidence
         self._reader: Any | None = None
+        self._reader_lock = threading.Lock()
 
     def recognize_blocks(self, image: bytes) -> OcrResult:
         """Recognize receipt text with bounding boxes.
@@ -83,10 +86,13 @@ class EasyOcrEngine:
         return blocks_to_text(self.recognize_blocks(image))
 
     def _reader_instance(self) -> Any:
-        if self._reader is None:
-            try:
-                import easyocr
-            except ImportError as exc:
-                raise OcrEngineUnavailableError("easyocr is not installed") from exc
-            self._reader = easyocr.Reader(self._languages, gpu=self._gpu)
-        return self._reader
+        if self._reader is not None:
+            return self._reader
+        with self._reader_lock:
+            if self._reader is None:
+                try:
+                    import easyocr
+                except ImportError as exc:
+                    raise OcrEngineUnavailableError("easyocr is not installed") from exc
+                self._reader = easyocr.Reader(self._languages, gpu=self._gpu)
+            return self._reader
