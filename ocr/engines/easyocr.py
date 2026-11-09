@@ -53,14 +53,19 @@ class EasyOcrEngine:
             Recognized blocks with absolute-pixel bounding boxes.
 
         Raises:
-            OcrEngineUnavailableError: If ``easyocr`` is not installed.
+            ImageDecodeError: If the image bytes cannot be decoded.
+            OcrEngineUnavailableError: If EasyOCR cannot be loaded or fails during recognition.
         """
-        reader = self._reader_instance()
         array = decode_image(image)
         height, width = array.shape[:2]
+        reader = self._reader_instance()
+        try:
+            recognized = reader.readtext(array)
+        except Exception as exc:
+            raise OcrEngineUnavailableError("easyocr recognition failed") from exc
 
         blocks: list[TextBlock] = []
-        for quad, text, confidence in reader.readtext(array):
+        for quad, text, confidence in recognized:
             stripped = str(text).strip()
             score = min(1.0, max(0.0, float(confidence)))
             if not stripped or score < self._min_confidence:
@@ -94,5 +99,8 @@ class EasyOcrEngine:
                     import easyocr
                 except ImportError as exc:
                     raise OcrEngineUnavailableError("easyocr is not installed") from exc
-                self._reader = easyocr.Reader(self._languages, gpu=self._gpu)
-            return self._reader
+                try:
+                    self._reader = easyocr.Reader(self._languages, gpu=self._gpu)
+                except Exception as exc:
+                    raise OcrEngineUnavailableError("easyocr reader initialization failed") from exc
+        return self._reader
