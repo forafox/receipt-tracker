@@ -215,3 +215,11 @@ OCR_RUN_EASYOCR=1 uv run pytest -m slow
 - Правило описано в docstring `OcrService`/`build_default_ocr_service()` и в разделе
   «Владение движком и остановка приложения».
 - Функциональный код не менялся; `bot/` и общие контракты не затронуты.
+
+## Изменения в ветке `fix/ocr-easyocr-error-mapping`
+
+- Изображение декодируется до инициализации EasyOCR, поэтому битый файл остаётся
+  `ImageDecodeError`, а не ошибкой движка.
+- Ошибки `easyocr.Reader` и `readtext` переводятся в `OcrEngineUnavailableError`; пайплайн
+  отвечает «распознавание временно недоступно» вместо общего сбоя.
+- Добавлены тесты на загрузку модели, inference и битое изображение; `make check` проходит.
