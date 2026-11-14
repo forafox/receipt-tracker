@@ -16,11 +16,13 @@ def main() -> None:
     train_parser = subparsers.add_parser("train")
     train_parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET_PATH)
     train_parser.add_argument("--model", type=Path, default=DEFAULT_MODEL_PATH)
+    train_parser.add_argument("--epochs", type=float, default=6.0)
 
     dataset_parser = subparsers.add_parser("build-dataset")
     dataset_parser.add_argument("--output", type=Path, default=DEFAULT_DATASET_PATH)
     dataset_parser.add_argument("--seed", type=Path, default=Path("categorize/data/items.csv"))
-    dataset_parser.add_argument("--limit", type=int, default=2000)
+    dataset_parser.add_argument("--limit", type=int, default=5000)
+    dataset_parser.add_argument("--max-per-category", type=int, default=5000)
 
     eval_parser = subparsers.add_parser("eval")
     eval_parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET_PATH)
@@ -28,18 +30,25 @@ def main() -> None:
 
     args = parser.parse_args()
     if args.command == "build-dataset":
-        build_training_csv(args.output, args.seed, args.limit)
+        build_training_csv(
+            args.output,
+            args.seed,
+            args.limit,
+            max_per_category=args.max_per_category,
+        )
         return
 
     if args.command == "train":
-        train_model(args.dataset, args.model)
+        train_model(args.dataset, args.model, epochs=args.epochs)
         return
 
     if not args.model.exists():
         train_model(args.dataset, args.model)
     classifier: CategoryClassifier = TransformerCategoryClassifier.load(args.model)
     result = evaluate(classifier, load_training_examples(args.dataset))
-    print(f"accuracy={result.accuracy:.3f} examples={result.examples}")
+    print(
+        f"accuracy={result.accuracy:.3f} micro_f1={result.micro_f1:.3f} examples={result.examples}"
+    )
 
 
 if __name__ == "__main__":

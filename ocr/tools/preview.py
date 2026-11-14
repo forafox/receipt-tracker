@@ -7,12 +7,12 @@ import cv2
 import numpy as np
 
 from common.ocr import OcrResult
-from ocr.config import OcrSettings
-from ocr.dataset_det import Box, build_detection_dataset
-from ocr.factory import build_ocr_engine
-from ocr.geometry import axis_aligned
+from ocr.core.config import OcrSettings
+from ocr.core.geometry import axis_aligned
+from ocr.datasets.detection import Box, build_detection_dataset
+from ocr.engines.factory import build_ocr_engine
 
-PREVIEW_DIR = Path(__file__).resolve().parent / "_preview"
+PREVIEW_DIR = Path(__file__).resolve().parents[1] / "_preview"
 
 
 def parse_args() -> argparse.Namespace:

@@ -1,15 +1,17 @@
 from pipeline.receipt import (
     MonthlySummary,
-    NullRecognizer,
+    ReceiptAlreadySaved,
+    ReceiptImageTooLarge,
     ReceiptPipeline,
     ReceiptUnreadable,
-    TextRecognizer,
+    RecognitionUnavailable,
 )
 
 __all__ = [
     "MonthlySummary",
-    "NullRecognizer",
+    "ReceiptAlreadySaved",
+    "ReceiptImageTooLarge",
     "ReceiptPipeline",
     "ReceiptUnreadable",
-    "TextRecognizer",
+    "RecognitionUnavailable",
 ]

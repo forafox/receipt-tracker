@@ -8,9 +8,9 @@ import pytest
 
 pytest.importorskip("pytesseract")
 
-from ocr.dataset_rec import DATASET_ROOT, EngRecognitionDataset  # noqa: E402
-from ocr.errors import OcrEngineUnavailableError  # noqa: E402
-from ocr.tesseract_engine import TesseractEngine  # noqa: E402
+from ocr.core.errors import OcrEngineUnavailableError  # noqa: E402
+from ocr.datasets.recognition import DATASET_ROOT, EngRecognitionDataset  # noqa: E402
+from ocr.engines.tesseract import TesseractEngine  # noqa: E402
 
 pytestmark = pytest.mark.slow
 

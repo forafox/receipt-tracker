@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import inspect
 import random
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from datasets import Dataset
@@ -20,9 +22,37 @@ from categorize.dataset import load_training_examples
 from categorize.schemas import TrainingExample
 from categorize.transformer import TransformerCategoryClassifier
 
+# Compatibility shim: transformers 4.39 passes arguments such as
+# ``dispatch_batches``/``even_batches`` to ``accelerate.Accelerator``; newer
+# accelerate releases moved them into ``DataLoaderConfiguration``. Dropping the
+# unsupported keywords keeps Trainer usable on that version pair.
+try:  # pragma: no cover - trivial import guard
+    from accelerate import Accelerator as _Accelerator
+
+    _accelerator_init = _Accelerator.__init__
+    _accelerator_params = inspect.signature(_accelerator_init).parameters
+    _accelerator_accepts_kwargs = "kwargs" in _accelerator_params
+
+    def _accelerator_init_without_unsupported(
+        self: object, *args: object, **kwargs: object
+    ) -> None:
+        if not _accelerator_accepts_kwargs:
+            for key in list(kwargs):
+                if key not in _accelerator_params:
+                    kwargs.pop(key)
+        _accelerator_init(self, *args, **kwargs)
+
+    _Accelerator.__init__ = _accelerator_init_without_unsupported
+except ImportError:  # pragma: no cover - accelerate is a transformers dependency
+    pass
+
 DEFAULT_BASE_MODEL = "cointegrated/rubert-tiny"
 DEFAULT_MAX_LENGTH = 64
 DEFAULT_THRESHOLD = 0.5
+MAX_OVERSAMPLE_TARGET = 5000
+MAX_OVERSAMPLE_REPEAT = 4
+_TRAINER_PARAMS = inspect.signature(Trainer.__init__).parameters
+_TRAINING_ARGUMENT_PARAMS = inspect.signature(TrainingArguments.__init__).parameters
 
 
 def train_transformer(
@@ -61,33 +91,50 @@ def train_transformer(
         label2id=label_to_id,
         problem_type="multi_label_classification",
     )
-    args = TrainingArguments(
-        output_dir=str(output_dir),
-        eval_strategy="epoch",
-        save_strategy="no",
-        learning_rate=5e-5,
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
-        num_train_epochs=epochs,
-        weight_decay=0.01,
-        load_best_model_at_end=False,
-        logging_steps=5,
-        report_to=[],
-        seed=42,
-    )
-    trainer = Trainer(
-        model=model,
-        args=args,
-        train_dataset=tokenized_train,
-        eval_dataset=tokenized_eval,
-        processing_class=tokenizer,
-        data_collator=DataCollatorWithPadding(tokenizer=tokenizer),
-        compute_metrics=_compute_metrics,
-    )
+    args = _build_training_arguments(output_dir, epochs)
+    trainer_kwargs: dict[str, Any] = {
+        "model": model,
+        "args": args,
+        "train_dataset": tokenized_train,
+        "eval_dataset": tokenized_eval,
+        "data_collator": DataCollatorWithPadding(tokenizer=tokenizer),
+        "compute_metrics": _compute_metrics,
+    }
+    if "processing_class" in _TRAINER_PARAMS:
+        trainer_kwargs["processing_class"] = tokenizer
+    else:
+        trainer_kwargs["tokenizer"] = tokenizer
+    trainer = Trainer(**trainer_kwargs)
     trainer.train()
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(output_dir)
     TransformerCategoryClassifier.save_metadata(output_dir, id_to_label, max_length)
+
+
+def _build_training_arguments(output_dir: Path, epochs: float) -> TrainingArguments:
+    """Build ``TrainingArguments`` across transformers versions.
+
+    ``evaluation_strategy`` was renamed to ``eval_strategy`` in transformers
+    4.41, so the argument name is chosen by inspecting the installed version.
+    """
+    kwargs: dict[str, Any] = {
+        "output_dir": str(output_dir),
+        "save_strategy": "no",
+        "learning_rate": 5e-5,
+        "per_device_train_batch_size": 8,
+        "per_device_eval_batch_size": 8,
+        "num_train_epochs": epochs,
+        "weight_decay": 0.01,
+        "load_best_model_at_end": False,
+        "logging_steps": 5,
+        "report_to": [],
+        "seed": 42,
+    }
+    if "eval_strategy" in _TRAINING_ARGUMENT_PARAMS:
+        kwargs["eval_strategy"] = "epoch"
+    else:
+        kwargs["evaluation_strategy"] = "epoch"
+    return TrainingArguments(**kwargs)
 
 
 def _build_dataset(examples: list[TrainingExample], label_to_id: dict[str, int]) -> Dataset:
@@ -100,9 +147,17 @@ def _build_dataset(examples: list[TrainingExample], label_to_id: dict[str, int])
 
 
 def _oversample_training_dataset(dataset: Dataset) -> Dataset:
+    """Balance the train fold without turning a small class into a majority.
+
+    Repeating every class up to the majority count makes a class with a few
+    distinct texts (e.g. ``cafe``) appear thousands of times, and the model
+    starts using surface artefacts of that class instead of its meaning.
+    Each class is therefore capped at ``MAX_OVERSAMPLE_REPEAT`` passes over
+    its own examples.
+    """
     labels = [_primary_label(label_vector) for label_vector in dataset["labels"]]
     counts = Counter(labels)
-    target_count = max(counts.values())
+    target_count = min(max(counts.values()), MAX_OVERSAMPLE_TARGET)
     indices_by_label: defaultdict[int, list[int]] = defaultdict(list)
     for index, label in enumerate(labels):
         indices_by_label[label].append(index)
@@ -110,7 +165,8 @@ def _oversample_training_dataset(dataset: Dataset) -> Dataset:
     balanced_indices: list[int] = []
     for label in sorted(indices_by_label):
         indices = indices_by_label[label]
-        repeats = [indices[index % len(indices)] for index in range(target_count)]
+        label_target = min(target_count, len(indices) * MAX_OVERSAMPLE_REPEAT)
+        repeats = [indices[index % len(indices)] for index in range(label_target)]
         balanced_indices.extend(repeats)
     return dataset.select(balanced_indices)
 

@@ -46,36 +46,113 @@
 - **Добавление confidence и bbox** — диагностическая информация для отладки и доверия.
 - **Возврат наружу** — без сохранения в БД/файл; ошибки качества и частичные результаты возвращаются тем же путём.
 
+## Структура пакета
+
+```
+ocr/
+  service.py  # центральный сервис OcrService, выбирающий движок по конфигу
+  core/       # конфиг, ошибки, геометрия, порядок блоков, метрики
+  engines/    # tesseract.py, easyocr.py, factory.py
+  datasets/   # detection.py, recognition.py, viewer.py
+  tools/      # preview.py, eval_ocr.py
+```
+
 ## Движки OCR
 
 Реализованы два взаимозаменяемых движка за общим контрактом из `common/ocr.py`:
 
 | Движок | Класс | Зависимости |
 |---|---|---|
-| Tesseract | `ocr.tesseract_engine.TesseractEngine` | `pytesseract` + бинарь `tesseract` |
-| EasyOCR | `ocr.easyocr_engine.EasyOcrEngine` | `easyocr` (первый запуск скачивает веса) |
+| Tesseract | `ocr.engines.tesseract.TesseractEngine` | `pytesseract` + бинарь `tesseract` |
+| EasyOCR | `ocr.engines.easyocr.EasyOcrEngine` | `easyocr` (первый запуск скачивает веса) |
 
 Контракт:
 
 - `TextBlock` — распознанный фрагмент: `text`, `bbox` (4 точки-полигона в пикселях), `confidence`.
 - `OcrResult` — список блоков и размеры исходного изображения.
 - `OcrEngine` — протокол с методами `recognize_blocks(image: bytes) -> OcrResult` и
-  `recognize(image: bytes) -> str`. Второй метод совпадает с `pipeline.TextRecognizer`, поэтому
-  движок можно передать в пайплайн без адаптера.
+  `recognize(image: bytes) -> str`. Пайплайн M4 зависит от этого протокола и вызывает
+  `recognize_blocks`, поэтому движок можно передать в пайплайн без адаптера.
 
-Выбор движка — через конфиг (`ocr.config.OcrSettings`, переменные окружения с префиксом `OCR_`):
-`OCR_ENGINE`, `OCR_TESSERACT_LANGUAGES`, `OCR_EASYOCR_LANGUAGES`, `OCR_MIN_CONFIDENCE`, `OCR_GPU`.
+Выбор движка — через конфиг (`ocr.core.config.OcrSettings`, переменные окружения с префиксом `OCR_`):
+`OCR_ENGINE`, `OCR_TESSERACT_LANGUAGES`, `OCR_EASYOCR_LANGUAGES`, `OCR_MIN_CONFIDENCE`, `OCR_GPU`,
+`OCR_TESSERACT_CONFIG`.
+
+### Ограничение размера входного изображения
+
+По замечанию преподавателя по итогам ревью: `decode_image` проверял только успешность
+декодирования и не ограничивал размер входа. Очень большое изображение могло занять
+существенно больше памяти и времени ещё до начала OCR.
+
+Что изменено: добавлены пределы `MAX_IMAGE_BYTES` (20 МиБ) для закодированных данных и
+`MAX_IMAGE_PIXELS` (25 млн пикселей) для результата декодирования. Слишком большой вход
+отклоняется исключением `ImageTooLargeError` — подклассом `ImageDecodeError`, поэтому
+пайплайн по-прежнему сообщает пользователю, что чек не удалось прочитать. Размер байтов
+проверяется до декодирования, размер в пикселях — сразу после него, до копирования в RGB и
+запуска OCR. Добавлены тесты на отклонение и на граничные значения.
+
+### Сервис OCR
+
+Центральная точка входа — `ocr.service.OcrService`. Он выбирает движок по конфигу и лениво
+создаёт его при первом вызове, поэтому импорт `ocr` остаётся лёгким:
+
+```python
+from ocr import OcrService, build_default_ocr_service
+
+service = build_default_ocr_service()  # конфиг из окружения/.env
+result = service.process_receipt(image_bytes)  # OcrResult: текст + bbox
+text = service.recognize(image_bytes)  # plain text (совместим с pipeline)
+```
+
+`OcrService` сам реализует контракт `OcrEngine`, поэтому его можно подставить в
+`pipeline.ReceiptPipeline` вместо `NullRecognizer` без адаптера.
+
+### Владение движком и остановка приложения
+
+По замечанию ревью: не хватало явного правила, кто освобождает OCR-движок при остановке
+приложения. Сначала проверили, требует ли выбранная реализация явного закрытия:
+
+- Tesseract (`pytesseract==0.3.13`): `TesseractEngine` вызывает бинарь `tesseract` на каждый
+  запрос; долгоживущего процесса или соединения нет.
+- EasyOCR (`easyocr==1.7.2`): у `easyocr.Reader` нет публичных `close`, `shutdown` или
+  `release`; модель освобождается при потере ссылки и завершении процесса.
+
+Явное освобождение текущим движкам не требуется, поэтому `OcrService` намеренно не
+предоставляет `close()`. Правило владения:
+
+- Движок, созданный сервисом, принадлежит сервису и живёт до завершения процесса; отдельно
+  закрывать его не нужно.
+- Движок, переданный в `OcrService(engine=...)`, остаётся собственностью вызывающего;
+  сервис его не закрывает.
+- Если появится движок, которому нужно освобождать ресурсы, он должен прийти вместе с явным
+  shutdown-API сервиса и вызывающим кодом, который этот API использует.
+
+### Потокобезопасное создание OCR-движка
+
+По замечанию преподавателя по итогам ревью: при одновременных первых вызовах `OcrService`
+мог создать несколько экземпляров движка, потому что проверка `_engine is None` не была
+синхронизирована. В боте один `OcrService` используется всеми обработчиками, а распознавание
+выполняется в отдельных потоках через `asyncio.to_thread`, поэтому гонка была реальной.
+
+Что изменено: ленивое создание движка защищено `threading.Lock` с повторной проверкой под
+блокировкой. Одновременно пришедшие запросы теперь получают один и тот же экземпляр.
+Добавлен тест, который запускает несколько потоков на первом вызове и проверяет, что движок
+создан ровно один раз. Вызовы распознавания при этом не сериализуются.
+
+Сценарий проверен также через `asyncio.to_thread` — именно так пайплайн вызывает OCR.
+Тест `test_concurrent_first_use_through_asyncio_to_thread_builds_once` подтверждает, что
+движок создаётся один раз и при таком запуске.
 
 ### Примеры работы
 
-Результат `ocr.preview` на одном и том же чеке: зелёным — эталонные боксы из `dataset/`,
+Результат `ocr.tools.preview` на одном и том же чеке: зелёным — эталонные боксы из `dataset/`,
 красным — предсказания движка.
 
 | EasyOCR | Tesseract |
 |---|---|
 | ![EasyOCR](./docs/preview_easyocr.jpg) | ![Tesseract](./docs/preview_tesseract.jpg) |
 
-Примеры — уменьшенные копии вывода `ocr.preview`; рабочие изображения пишутся в
+Примеры — уменьшенные копии вывода `ocr.tools.preview`; рабочие изображения пишутся в
 `ocr/_preview/` и в репозиторий не коммитятся.
 
 
@@ -84,15 +161,71 @@
 ```bash
 uv sync --group dev            # бот и обычные тесты без тяжёлых движков
 uv sync --group ocr            # движки OCR
-uv run python -m ocr.preview  --engine tesseract --source eng --split test --index 0
-uv run python -m ocr.eval_ocr --engine tesseract --task rec --source eng --split test --limit 50
-uv run python -m ocr.eval_ocr --engine tesseract --task det --source ru  --split test --limit 50
+uv run python -m ocr.tools.preview  --engine tesseract --source eng --split test --index 0
+uv run python -m ocr.tools.eval_ocr --engine tesseract --task rec --source eng --split test --limit 50
+uv run python -m ocr.tools.eval_ocr --engine tesseract --task det --source ru  --split test --limit 50
+uv run python -m ocr.datasets.viewer --task det --source eng --split test --count 5
 OCR_RUN_EASYOCR=1 uv run pytest -m slow
 ```
 
-- `ocr.preview` рисует на изображении эталонные боксы (зелёным) и предсказания движка (красным)
-  и сохраняет PNG в `ocr/_preview/` (в `.gitignore`).
-- `ocr.eval_ocr` считает детекцию (precision/recall/F1, средний IoU) и распознавание (CER/WER,
+- `ocr.tools.preview` рисует на изображении эталонные боксы (зелёным) и предсказания движка
+  (красным) и сохраняет PNG в `ocr/_preview/` (в `.gitignore`).
+- `ocr.tools.eval_ocr` считает детекцию (precision/recall/F1, средний IoU) и распознавание (CER/WER,
   точное совпадение) на детерминированной выборке из `dataset/`.
 - Тесты с реальными движками помечены `@pytest.mark.slow` и не входят в `make check`; EasyOCR
   дополнительно требует `OCR_RUN_EASYOCR=1`, так как скачивает модели.
+
+## Изменения в ветке `refactor/ocr-reorganize-package`
+
+- Пакет `ocr/` разделён на подпакеты: `core/`, `engines/`, `datasets/`, `tools/`.
+- Модули переименованы под контекст: `tesseract.py`, `easyocr.py`, `detection.py`, `recognition.py`.
+- Обновлены импорты в коде и тестах; публичный API `ocr/__init__.py` не изменился.
+- Исправлены пути, зависящие от расположения модулей: `DATASET_ROOT` и `PREVIEW_DIR`.
+- Новые точки входа: `python -m ocr.tools.preview`, `python -m ocr.tools.eval_ocr`,
+  `python -m ocr.datasets.viewer`.
+- `make check` проходит; slow-тест Tesseract проходит, EasyOCR требует `OCR_RUN_EASYOCR=1`.
+
+## Изменения в ветке `feat/ocr-service`
+
+- Добавлен центральный сервис `ocr.service.OcrService`: выбирает движок по `OcrSettings`,
+  лениво создаёт его при первом вызове и сам реализует контракт `OcrEngine`.
+- Методы сервиса: `process_receipt(image)` и `recognize_blocks(image)` возвращают `OcrResult`
+  (текст + bbox), `recognize(image)` — plain text, совместимый с `pipeline.TextRecognizer`.
+- Добавлен `build_default_ocr_service()` — сервис с конфигом по умолчанию/из окружения.
+- В `OcrSettings` добавлен `tesseract_config`; значение прокидывается в `TesseractEngine`.
+- `OcrService` и `build_default_ocr_service` экспортируются из `ocr/__init__.py`.
+- В `.env.example` добавлены переменные `OCR_ENGINE`, `OCR_TESSERACT_LANGUAGES`,
+  `OCR_EASYOCR_LANGUAGES`, `OCR_MIN_CONFIDENCE`, `OCR_GPU`, `OCR_TESSERACT_CONFIG`.
+- Добавлены тесты `tests/ocr/test_service.py`: делегирование движку, ленивое создание,
+  совместимость с `OcrEngine` и `pipeline.TextRecognizer`.
+
+## Изменения в ветке `test/ocr-concurrent-first-use`
+
+- Добавлен тест `test_concurrent_first_use_through_asyncio_to_thread_builds_once`:
+  конкурентные первые вызовы через `asyncio.to_thread` (паттерн пайплайна) создают движок
+  ровно один раз.
+- Тест дополняет существующий потоковый тест и не меняет production-код.
+- `bot/` и общие контракты не затронуты.
+## Изменения в ветке `docs/ocr-engine-lifecycle`
+
+- Зафиксировано правило владения OCR-движком: созданный сервисом движок живёт до завершения
+  процесса, а движок, переданный через `engine=`, остаётся у вызывающего.
+- Проверено, что текущим движкам (`pytesseract==0.3.13`, `easyocr==1.7.2`) не требуется
+  явное освобождение ресурсов; спекулятивный `close()` не добавлялся.
+- Правило описано в docstring `OcrService`/`build_default_ocr_service()` и в разделе
+  «Владение движком и остановка приложения».
+- Функциональный код не менялся; `bot/` и общие контракты не затронуты.
+
+## Изменения в ветке `fix/ocr-easyocr-reader-init-race`
+
+- Ленивое создание backend защищено `threading.Lock`: EasyOCR `Reader` и импорт
+  `pytesseract` выполняются один раз при конкурентных первых вызовах.
+- Без блокировки несколько потоков могли одновременно загрузить модель и повторно скачать веса.
+- Добавлены конкурентные тесты; `make check` проходит.
+## Изменения в ветке `fix/ocr-easyocr-error-mapping`
+
+- Изображение декодируется до инициализации EasyOCR, поэтому битый файл остаётся
+  `ImageDecodeError`, а не ошибкой движка.
+- Ошибки `easyocr.Reader` и `readtext` переводятся в `OcrEngineUnavailableError`; пайплайн
+  отвечает «распознавание временно недоступно» вместо общего сбоя.
+- Добавлены тесты на загрузку модели, inference и битое изображение; `make check` проходит.

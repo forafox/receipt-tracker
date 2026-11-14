@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 import cv2
 
 from common.ocr import OcrResult, TextBlock
-from ocr.errors import OcrEngineUnavailableError
-from ocr.image import decode_image
-from ocr.ordering import blocks_to_text
+from ocr.core.errors import OcrEngineUnavailableError
+from ocr.core.image import decode_image
+from ocr.core.ordering import blocks_to_text
 
 _WORD_LEVEL = 5
 
@@ -39,6 +40,7 @@ class TesseractEngine:
         self._min_confidence = min_confidence
         self._tesseract_config = tesseract_config
         self._pytesseract: Any | None = None
+        self._module_lock = threading.Lock()
 
     def recognize_blocks(self, image: bytes) -> OcrResult:
         """Recognize receipt text with bounding boxes.
@@ -85,13 +87,16 @@ class TesseractEngine:
         return blocks_to_text(self.recognize_blocks(image))
 
     def _module(self) -> Any:
-        if self._pytesseract is None:
-            try:
-                import pytesseract
-            except ImportError as exc:
-                raise OcrEngineUnavailableError("pytesseract is not installed") from exc
-            self._pytesseract = pytesseract
-        return self._pytesseract
+        if self._pytesseract is not None:
+            return self._pytesseract
+        with self._module_lock:
+            if self._pytesseract is None:
+                try:
+                    import pytesseract
+                except ImportError as exc:
+                    raise OcrEngineUnavailableError("pytesseract is not installed") from exc
+                self._pytesseract = pytesseract
+            return self._pytesseract
 
 
 def _line_blocks(data: dict[str, list[Any]], min_confidence: float) -> list[TextBlock]:

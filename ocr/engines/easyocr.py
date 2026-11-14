@@ -1,19 +1,21 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Sequence
 from typing import Any
 
 from common.ocr import OcrResult, TextBlock
-from ocr.errors import OcrEngineUnavailableError
-from ocr.image import decode_image
-from ocr.ordering import blocks_to_text
+from ocr.core.errors import OcrEngineUnavailableError
+from ocr.core.image import decode_image
+from ocr.core.ordering import blocks_to_text
 
 
 class EasyOcrEngine:
     """OCR engine backed by EasyOCR.
 
     The underlying ``easyocr.Reader`` is created lazily on the first recognition call, so
-    importing and constructing the engine never downloads model weights.
+    importing and constructing the engine never downloads model weights. Creation is
+    serialized, so concurrent first calls share one reader instance.
 
     Attributes:
         name: Engine identifier used by configuration and factories.
@@ -39,6 +41,7 @@ class EasyOcrEngine:
         self._gpu = gpu
         self._min_confidence = min_confidence
         self._reader: Any | None = None
+        self._reader_lock = threading.Lock()
 
     def recognize_blocks(self, image: bytes) -> OcrResult:
         """Recognize receipt text with bounding boxes.
@@ -50,14 +53,19 @@ class EasyOcrEngine:
             Recognized blocks with absolute-pixel bounding boxes.
 
         Raises:
-            OcrEngineUnavailableError: If ``easyocr`` is not installed.
+            ImageDecodeError: If the image bytes cannot be decoded.
+            OcrEngineUnavailableError: If EasyOCR cannot be loaded or fails during recognition.
         """
-        reader = self._reader_instance()
         array = decode_image(image)
         height, width = array.shape[:2]
+        reader = self._reader_instance()
+        try:
+            recognized = reader.readtext(array)
+        except Exception as exc:
+            raise OcrEngineUnavailableError("easyocr recognition failed") from exc
 
         blocks: list[TextBlock] = []
-        for quad, text, confidence in reader.readtext(array):
+        for quad, text, confidence in recognized:
             stripped = str(text).strip()
             score = min(1.0, max(0.0, float(confidence)))
             if not stripped or score < self._min_confidence:
@@ -83,10 +91,16 @@ class EasyOcrEngine:
         return blocks_to_text(self.recognize_blocks(image))
 
     def _reader_instance(self) -> Any:
-        if self._reader is None:
-            try:
-                import easyocr
-            except ImportError as exc:
-                raise OcrEngineUnavailableError("easyocr is not installed") from exc
-            self._reader = easyocr.Reader(self._languages, gpu=self._gpu)
+        if self._reader is not None:
+            return self._reader
+        with self._reader_lock:
+            if self._reader is None:
+                try:
+                    import easyocr
+                except ImportError as exc:
+                    raise OcrEngineUnavailableError("easyocr is not installed") from exc
+                try:
+                    self._reader = easyocr.Reader(self._languages, gpu=self._gpu)
+                except Exception as exc:
+                    raise OcrEngineUnavailableError("easyocr reader initialization failed") from exc
         return self._reader

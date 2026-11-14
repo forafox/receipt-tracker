@@ -32,3 +32,46 @@ class ReceiptService(Protocol):
             Spending summary for the month.
         """
         ...
+
+    async def recent_receipts(self, user_id: int) -> list[Receipt]:
+        """List a user's most recent receipts.
+
+        Args:
+            user_id: Telegram user identifier.
+
+        Returns:
+            Receipts ordered from the newest to the oldest.
+        """
+        ...
+
+    async def undo_last(self, user_id: int) -> Receipt | None:
+        """Delete the receipt the user saved most recently.
+
+        Args:
+            user_id: Telegram user identifier.
+
+        Returns:
+            Deleted receipt, or None if the user has no receipts.
+        """
+        ...
+
+    async def save_duplicate(self, user_id: int, pending_id: int) -> Receipt | None:
+        """Save a receipt rejected as a duplicate, after the user confirmed it.
+
+        Args:
+            user_id: Telegram user identifier.
+            pending_id: Identifier of the rejected receipt.
+
+        Returns:
+            Saved receipt, or None if this receipt is no longer pending.
+        """
+        ...
+
+    def discard_duplicate(self, user_id: int, pending_id: int) -> None:
+        """Forget a receipt rejected as a duplicate.
+
+        Args:
+            user_id: Telegram user identifier.
+            pending_id: Identifier of the rejected receipt.
+        """
+        ...

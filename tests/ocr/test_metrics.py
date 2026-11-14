@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from ocr.metrics import character_error_rate, levenshtein, word_error_rate
+from ocr.core.metrics import character_error_rate, levenshtein, word_error_rate
 
 
 def test_levenshtein_known_distances() -> None:

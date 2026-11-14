@@ -9,13 +9,13 @@ import cv2
 import numpy as np
 
 from common.ocr import OcrEngine
-from ocr.config import OcrSettings
-from ocr.dataset_det import build_detection_dataset
-from ocr.dataset_rec import build_recognition_dataset
-from ocr.factory import build_ocr_engine
-from ocr.geometry import Box, axis_aligned, iou
-from ocr.metrics import character_error_rate, word_error_rate
-from ocr.ordering import blocks_to_text
+from ocr.core.config import OcrSettings
+from ocr.core.geometry import Box, axis_aligned, iou
+from ocr.core.metrics import character_error_rate, word_error_rate
+from ocr.core.ordering import blocks_to_text
+from ocr.datasets.detection import build_detection_dataset
+from ocr.datasets.recognition import build_recognition_dataset
+from ocr.engines.factory import build_ocr_engine
 
 RECOGNITION_UPSCALE = 3.0
 

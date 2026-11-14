@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from common.ocr import OcrResult, TextBlock
-from ocr.geometry import Box, axis_aligned
+from ocr.core.geometry import Box, axis_aligned
 
 
 def blocks_to_text(result: OcrResult, *, line_overlap: float = 0.5) -> str:

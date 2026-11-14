@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ocr.dataset_det import (
+from ocr.datasets.detection import (
     DATASET_ROOT,
     EngDetectionDataset,
     RuDetectionDataset,
@@ -11,7 +11,7 @@ from ocr.dataset_det import (
     load_ocr_index,
     receipt_uuid,
 )
-from ocr.dataset_rec import (
+from ocr.datasets.recognition import (
     EngRecognitionDataset,
     RuRecognitionDataset,
     contains_arabic,

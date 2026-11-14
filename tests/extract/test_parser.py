@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from common.contracts import Item
 from extract.parser import parse_receipt
 
 MOSCOW_TIMEZONE = ZoneInfo("Europe/Moscow")
@@ -27,7 +28,7 @@ def test_parse_receipt_extracts_unknown_merchant_without_brand_whitelist() -> No
     assert receipt.datetime == datetime(2026, 10, 5, 18, 20, tzinfo=MOSCOW_TIMEZONE)
     assert receipt.datetime.tzinfo is MOSCOW_TIMEZONE
     assert receipt.total == Decimal("250.00")
-    assert receipt.items == []
+    assert receipt.items == [Item(name="КАПУЧИНО", sum=Decimal("250.00"))]
     assert receipt.warnings == []
 
 
@@ -51,6 +52,38 @@ def test_store_preserves_cleaned_original_line() -> None:
     )
 
     assert receipt.store == "Семейная пекарня №7"
+
+
+def test_amount_bearing_product_is_not_used_as_merchant() -> None:
+    receipt = parse_receipt("05.10.2026 18:20\nХЛЕБ 50.00\nИТОГО 50.00", timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.store is None
+    assert receipt.items == [Item(name="ХЛЕБ", sum=Decimal("50.00"))]
+    assert receipt.warnings == ["store_not_found"]
+
+
+def test_merchant_can_follow_more_than_ten_fiscal_header_lines() -> None:
+    metadata = [f"ФД {number}" for number in range(12)]
+    receipt = parse_receipt(
+        "\n".join([*metadata, "МАГАЗИН У РЕКИ", "05.10.2026 18:20", "ИТОГО 50.00"]),
+        timezone=MOSCOW_TIMEZONE,
+    )
+
+    assert receipt.store == "МАГАЗИН У РЕКИ"
+    assert receipt.warnings == []
+
+
+def test_timestamp_with_ocr_punctuation_does_not_become_another_merchant() -> None:
+    receipt = parse_receipt(
+        "МАГАЗИН\nДата: .05.10.2026 18:20\nХЛЕБ 50.00\nИТОГО 50.00",
+        timezone=MOSCOW_TIMEZONE,
+    )
+
+    assert receipt.store == "МАГАЗИН"
+    assert receipt.datetime == datetime(2026, 10, 5, 18, 20, tzinfo=MOSCOW_TIMEZONE)
+    assert receipt.items == [Item(name="ХЛЕБ", sum=Decimal("50.00"))]
+    assert receipt.total == Decimal("50.00")
+    assert receipt.warnings == []
 
 
 def test_datetime_with_seconds_is_supported() -> None:
@@ -116,10 +149,20 @@ def test_total_extraction_continues_after_unusable_bottom_line() -> None:
     assert receipt.total == Decimal("200.00")
 
 
-def test_trailing_amount_is_preferred_on_total_line() -> None:
-    receipt = parse_receipt("ИТОГО НДС 20% 144,98", timezone=MOSCOW_TIMEZONE)
+@pytest.mark.parametrize("line", ["ИТОГО НДС 20% 144,98", "ИТОГО НДС 20% 24,16 144,98"])
+def test_trailing_amount_is_preferred_on_total_line(line: str) -> None:
+    receipt = parse_receipt(line, timezone=MOSCOW_TIMEZONE)
 
     assert receipt.total == Decimal("144.98")
+
+
+@pytest.mark.parametrize("amount", ["--12.99", "12.999"])
+def test_malformed_total_amount_is_not_partially_accepted(amount: str) -> None:
+    receipt = parse_receipt(f"МАГАЗИН\n05.10.2026 18:20\nИТОГО {amount}", timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.total is None
+    assert receipt.items == []
+    assert receipt.warnings == ["total_not_found"]
 
 
 def test_product_prices_are_not_used_as_total() -> None:

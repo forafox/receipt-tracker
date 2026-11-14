@@ -13,7 +13,7 @@ class BotSettings(BaseSettings):
         database_path: SQLite database file read from ``BOT_DATABASE_PATH``.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="BOT_")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="BOT_", extra="ignore")
 
     token: SecretStr
     timezone: str = "Europe/Moscow"

@@ -8,8 +8,8 @@ import pytest
 
 pytest.importorskip("easyocr")
 
-from ocr.dataset_rec import DATASET_ROOT, EngRecognitionDataset  # noqa: E402
-from ocr.easyocr_engine import EasyOcrEngine  # noqa: E402
+from ocr.datasets.recognition import DATASET_ROOT, EngRecognitionDataset  # noqa: E402
+from ocr.engines.easyocr import EasyOcrEngine  # noqa: E402
 
 pytestmark = pytest.mark.slow
 
