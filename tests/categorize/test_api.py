@@ -52,10 +52,7 @@ class TestAPIEndpointsStructural:
         # Check that the required paths exist
         route_paths = {r.path for r in app.routes if hasattr(r, "path")}
         required = {"/classify", "/classify/items", "/classify/receipt", "/train"}
-        # At minimum, these paths must be registered
-        assert required.issubset(route_paths) or True, (
-            "All PDF-specified endpoints must be registered"
-        )
+        assert required.issubset(route_paths), "All PDF-specified endpoints must be registered"
 
     def test_api_imports_structure(self) -> None:
         """PDF: api.py must define the FastAPI app and required functions."""

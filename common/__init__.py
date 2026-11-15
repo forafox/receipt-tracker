@@ -1,10 +1,9 @@
+from common.contracts import Item, Receipt
 from common.models import (
     CategoryPrediction,
     CategoryScore,
     ClassifiedItem,
     ClassifiedReceipt,
-    Item,
-    Receipt,
 )
 from common.ocr import OcrEngine, OcrResult, TextBlock
 

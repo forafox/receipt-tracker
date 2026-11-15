@@ -14,13 +14,20 @@ PDF requirements:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from categorize.manifest import load_manifest
 from common.models import CategoryPrediction, CategoryScore
+
+logger = logging.getLogger(__name__)
+
+# One threshold shared by inference and offline metrics.
+DEFAULT_THRESHOLD = 0.5
 
 
 class TransformerCategoryClassifier:
@@ -41,6 +48,24 @@ class TransformerCategoryClassifier:
         id_to_label: dict[int, str],
         max_length: int = 64,
     ) -> None:
+        # Fail on corrupt/mismatched metadata at loading time rather than at predict().
+        num_labels = getattr(model.config, "num_labels", None)
+        if not isinstance(num_labels, int) or num_labels < 1:
+            raise ValueError("model.config.num_labels must be a positive integer")
+        if set(id_to_label) != set(range(num_labels)):
+            raise ValueError(
+                f"id_to_label must contain indices 0..{num_labels - 1}; got {sorted(id_to_label)}"
+            )
+        if any(not isinstance(label, str) or not label.strip() for label in id_to_label.values()):
+            raise ValueError("id_to_label contains an empty/non-string category")
+        if len(set(id_to_label.values())) != num_labels:
+            raise ValueError("id_to_label contains duplicate category names")
+        config_labels = getattr(model.config, "id2label", None)
+        if (
+            config_labels is not None
+            and {int(index): label for index, label in config_labels.items()} != id_to_label
+        ):
+            raise ValueError("model config id2label and metadata id_to_label disagree")
         self._model = model
         self._tokenizer = tokenizer
         self._id_to_label = id_to_label
@@ -58,6 +83,14 @@ class TransformerCategoryClassifier:
         with (path / "category_metadata.json").open(encoding="utf-8") as file:
             metadata = json.load(file)
         id_to_label = {int(key): value for key, value in metadata["id_to_label"].items()}
+        manifest = load_manifest(path)
+        if manifest is not None and manifest.label_names:
+            expected = [id_to_label[index] for index in sorted(id_to_label)]
+            if manifest.label_names != expected:
+                raise ValueError(
+                    "model_manifest.json label_names disagree with category_metadata.json"
+                )
+            logger.info("Loaded model version %s", manifest.model_version)
         tokenizer = AutoTokenizer.from_pretrained(path)
         model = AutoModelForSequenceClassification.from_pretrained(path)
         return cls(
@@ -113,7 +146,8 @@ class TransformerCategoryClassifier:
         with torch.no_grad():
             logits = self._model(**encoded).logits[0]
 
-        # Apply sigmoid to get probabilities for each category
+        # Sigmoid returns independent scores in [0, 1], not calibrated confidence.
+        # DEFAULT_THRESHOLD and the best-label fallback are heuristic choices.
         probabilities = torch.sigmoid(logits)
 
         # Build list of (category, confidence) pairs
@@ -125,15 +159,18 @@ class TransformerCategoryClassifier:
             for idx, prob in enumerate(probabilities.tolist())
         ]
 
-        # Filter by threshold (0.5)
-        selected = [score for score in scores if score.confidence >= 0.5]
+        selected = [score for score in scores if score.confidence >= DEFAULT_THRESHOLD]
 
-        # If no category passes threshold, fall back to argmax
-        if not selected:
-            max_score = max(scores, key=lambda s: s.confidence)
-            selected = [max_score]
+        # No category passed: return argmax as an explicit, visible fallback.
+        fallback = not selected
+        if fallback:
+            selected = [max(scores, key=lambda score: score.confidence)]
 
         # Sort by confidence descending
         selected.sort(key=lambda score: score.confidence, reverse=True)
 
-        return CategoryPrediction(categories=selected)
+        return CategoryPrediction(
+            categories=selected,
+            threshold=DEFAULT_THRESHOLD,
+            fallback=fallback,
+        )
