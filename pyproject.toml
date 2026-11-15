@@ -23,6 +23,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.10",
+    "scikit-learn>=1.5",
 ]
 ocr = [
     "pytesseract>=0.3.13",

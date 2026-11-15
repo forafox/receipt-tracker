@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import functools
 import inspect
 import random
-from collections import Counter, defaultdict
-from collections.abc import Iterable
+from collections import defaultdict
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import torch
 from datasets import Dataset
+from torch.nn import functional as F
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -19,8 +23,14 @@ from transformers import (
 from transformers.trainer_utils import EvalPrediction
 
 from categorize.dataset import load_training_examples
+from categorize.manifest import (
+    MODEL_VERSION,
+    ModelManifest,
+    save_manifest,
+    sha256_file,
+)
 from categorize.schemas import TrainingExample
-from categorize.transformer import TransformerCategoryClassifier
+from categorize.transformer import DEFAULT_THRESHOLD, TransformerCategoryClassifier
 
 # Compatibility shim: transformers 4.39 passes arguments such as
 # ``dispatch_batches``/``even_batches`` to ``accelerate.Accelerator``; newer
@@ -48,7 +58,6 @@ except ImportError:  # pragma: no cover - accelerate is a transformers dependenc
 
 DEFAULT_BASE_MODEL = "cointegrated/rubert-tiny"
 DEFAULT_MAX_LENGTH = 64
-DEFAULT_THRESHOLD = 0.5
 MAX_OVERSAMPLE_TARGET = 5000
 MAX_OVERSAMPLE_REPEAT = 4
 _TRAINER_PARAMS = inspect.signature(Trainer.__init__).parameters
@@ -74,6 +83,7 @@ def train_transformer(
     dataset = _build_dataset(examples, label_to_id)
     train_dataset, eval_dataset = _stratified_split(dataset, test_size=0.2)
     train_dataset = _oversample_training_dataset(train_dataset)
+    pos_weight = _compute_pos_weight(train_dataset)
 
     tokenized_train = train_dataset.map(
         lambda batch: tokenizer(batch["text"], truncation=True, max_length=max_length),
@@ -98,17 +108,41 @@ def train_transformer(
         "train_dataset": tokenized_train,
         "eval_dataset": tokenized_eval,
         "data_collator": DataCollatorWithPadding(tokenizer=tokenizer),
-        "compute_metrics": _compute_metrics,
+        "compute_metrics": functools.partial(_compute_metrics, label_names=labels),
     }
     if "processing_class" in _TRAINER_PARAMS:
         trainer_kwargs["processing_class"] = tokenizer
     else:
         trainer_kwargs["tokenizer"] = tokenizer
-    trainer = Trainer(**trainer_kwargs)
+    trainer = _WeightedTrainer(**trainer_kwargs, pos_weight=pos_weight)
     trainer.train()
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(output_dir)
     TransformerCategoryClassifier.save_metadata(output_dir, id_to_label, max_length)
+
+    metrics = trainer.evaluate()
+    manifest = ModelManifest(
+        model_version=MODEL_VERSION,
+        base_model=base_model,
+        created_at=datetime.now(UTC).isoformat(),
+        dataset_path=str(dataset_path),
+        dataset_sha256=sha256_file(dataset_path),
+        hyperparameters={
+            "epochs": epochs,
+            "max_length": max_length,
+            "learning_rate": 5e-5,
+            "per_device_train_batch_size": 8,
+            "seed": 42,
+        },
+        thresholds={"default": DEFAULT_THRESHOLD},
+        metrics={
+            key.removeprefix("eval_"): float(value)
+            for key, value in metrics.items()
+            if isinstance(value, (int, float))
+        },
+        label_names=labels,
+    )
+    save_manifest(output_dir, manifest)
 
 
 def _build_training_arguments(output_dir: Path, epochs: float) -> TrainingArguments:
@@ -137,6 +171,39 @@ def _build_training_arguments(output_dir: Path, epochs: float) -> TrainingArgume
     return TrainingArguments(**kwargs)
 
 
+class _WeightedTrainer(Trainer):
+    """Trainer with per-label positive weighting for imbalanced multilabel data."""
+
+    def __init__(self, *args: Any, pos_weight: torch.Tensor | None = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.pos_weight = pos_weight
+
+    def compute_loss(  # type: ignore[override]
+        self,
+        model: Any,
+        inputs: dict[str, Any],
+        return_outputs: bool = False,
+        **kwargs: Any,
+    ) -> Any:
+        labels = inputs.pop("labels").float()
+        outputs = model(**inputs)
+        weight = self.pos_weight
+        loss = F.binary_cross_entropy_with_logits(
+            outputs.logits,
+            labels,
+            pos_weight=weight.to(outputs.logits.device) if weight is not None else None,
+        )
+        return (loss, outputs) if return_outputs else loss
+
+
+def _compute_pos_weight(dataset: Dataset, cap: float = 5.0) -> torch.Tensor:
+    labels = np.asarray(dataset["labels"], dtype=float)
+    positive = labels.sum(axis=0)
+    negative = labels.shape[0] - positive
+    weight = np.divide(negative, positive, out=np.ones_like(positive), where=positive > 0)
+    return torch.tensor(np.clip(weight, 1.0, cap), dtype=torch.float32)
+
+
 def _build_dataset(examples: list[TrainingExample], label_to_id: dict[str, int]) -> Dataset:
     return Dataset.from_dict(
         {
@@ -147,48 +214,71 @@ def _build_dataset(examples: list[TrainingExample], label_to_id: dict[str, int])
 
 
 def _oversample_training_dataset(dataset: Dataset) -> Dataset:
-    """Balance the train fold without turning a small class into a majority.
+    """Balance every label without over-repeating a tiny class.
 
-    Repeating every class up to the majority count makes a class with a few
-    distinct texts (e.g. ``cafe``) appear thousands of times, and the model
-    starts using surface artefacts of that class instead of its meaning.
-    Each class is therefore capped at ``MAX_OVERSAMPLE_REPEAT`` passes over
-    its own examples.
+    Each example is repeated by the factor needed to bring its rarest label up
+    to the majority count, capped at ``MAX_OVERSAMPLE_REPEAT`` passes.  The cap
+    prevents a class such as ``cafe`` (a few hundred texts) from being copied
+    thousands of times and memorised verbatim.
     """
-    labels = [_primary_label(label_vector) for label_vector in dataset["labels"]]
-    counts = Counter(labels)
-    target_count = min(max(counts.values()), MAX_OVERSAMPLE_TARGET)
-    indices_by_label: defaultdict[int, list[int]] = defaultdict(list)
-    for index, label in enumerate(labels):
-        indices_by_label[label].append(index)
-
-    balanced_indices: list[int] = []
-    for label in sorted(indices_by_label):
-        indices = indices_by_label[label]
-        label_target = min(target_count, len(indices) * MAX_OVERSAMPLE_REPEAT)
-        repeats = [indices[index % len(indices)] for index in range(label_target)]
-        balanced_indices.extend(repeats)
-    return dataset.select(balanced_indices)
+    vectors = np.asarray(dataset["labels"], dtype=float)
+    counts = vectors.sum(axis=0)
+    target = min(float(counts.max()), MAX_OVERSAMPLE_TARGET)
+    indices: list[int] = []
+    for index, vector in enumerate(vectors):
+        present = counts[vector >= 0.5]
+        factor = int(round(target / present.min())) if present.size else 1
+        repeats = max(1, min(MAX_OVERSAMPLE_REPEAT, factor))
+        indices.extend([index] * repeats)
+    return dataset.select(indices)
 
 
 def _stratified_split(dataset: Dataset, test_size: float) -> tuple[Dataset, Dataset]:
-    labels = [_primary_label(label_vector) for label_vector in dataset["labels"]]
-    indices_by_label: defaultdict[int, list[int]] = defaultdict(list)
-    for index, label in enumerate(labels):
-        indices_by_label[label].append(index)
+    """Split by whole label sets so multilabel rows are not torn apart."""
+    label_sets = [
+        tuple(index for index, value in enumerate(vector) if value >= 0.5)
+        for vector in dataset["labels"]
+    ]
+    groups: defaultdict[tuple[int, ...], list[int]] = defaultdict(list)
+    for index, label_set in enumerate(label_sets):
+        groups[label_set].append(index)
 
+    rng = random.Random(42)
     train_indices: list[int] = []
     test_indices: list[int] = []
-    for label in sorted(indices_by_label):
-        indices = indices_by_label[label]
-        random.Random(42 + label).shuffle(indices)
+    for label_set in sorted(groups):
+        indices = groups[label_set]
+        rng.shuffle(indices)
+        if len(indices) < 2:
+            train_indices.extend(indices)
+            continue
         test_count = max(1, int(round(len(indices) * test_size)))
         test_indices.extend(indices[:test_count])
         train_indices.extend(indices[test_count:])
+
+    # A rare label may sit in a one-example group; make sure it is evaluated.
+    test_labels = {label for index in test_indices for label in label_sets[index]}
+    all_labels = {label for label_set in groups for label in label_set}
+    train_counts: dict[int, int] = defaultdict(int)
+    for index in train_indices:
+        for label in label_sets[index]:
+            train_counts[label] += 1
+    for label in sorted(all_labels - test_labels):
+        movable = next(
+            (index for index in train_indices if label in label_sets[index]),
+            None,
+        )
+        if movable is not None and train_counts[label] > 1:
+            train_indices.remove(movable)
+            test_indices.append(movable)
+            for moved_label in label_sets[movable]:
+                train_counts[moved_label] -= 1
     return dataset.select(train_indices), dataset.select(test_indices)
 
 
-def _compute_metrics(eval_pred: EvalPrediction) -> dict[str, float]:
+def _compute_metrics(
+    eval_pred: EvalPrediction, label_names: Sequence[str] = ()
+) -> dict[str, float]:
     logits = np.asarray(eval_pred.predictions)
     labels = np.asarray(eval_pred.label_ids)
     probabilities = 1 / (1 + np.exp(-logits))
@@ -203,10 +293,27 @@ def _compute_metrics(eval_pred: EvalPrediction) -> dict[str, float]:
     precision = true_positive / predicted_positive if predicted_positive else 0.0
     recall = true_positive / actual_positive if actual_positive else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-    return {
-        "exact_match": float(exact_match),
-        "micro_f1": float(f1),
-    }
+
+    per_label_f1: list[float] = []
+    metrics: dict[str, float] = {"exact_match": float(exact_match), "micro_f1": float(f1)}
+    for column in range(labels.shape[1]):
+        tp = float((predictions[:, column] * labels[:, column]).sum())
+        predicted = float(predictions[:, column].sum())
+        actual = float(labels[:, column].sum())
+        column_precision = tp / predicted if predicted else 0.0
+        column_recall = tp / actual if actual else 0.0
+        column_f1 = (
+            2 * column_precision * column_recall / (column_precision + column_recall)
+            if column_precision + column_recall
+            else 0.0
+        )
+        per_label_f1.append(column_f1)
+        name = label_names[column] if column < len(label_names) else str(column)
+        metrics[f"precision_{name}"] = float(column_precision)
+        metrics[f"recall_{name}"] = float(column_recall)
+        metrics[f"f1_{name}"] = float(column_f1)
+    metrics["macro_f1"] = float(np.mean(per_label_f1)) if per_label_f1 else 0.0
+    return metrics
 
 
 def _example_labels(example: TrainingExample) -> list[str]:
@@ -218,8 +325,3 @@ def _multi_hot(labels: list[str], label_to_id: dict[str, int]) -> list[float]:
     for label in labels:
         encoded[label_to_id[label]] = 1.0
     return encoded
-
-
-def _primary_label(label_vector: Iterable[float | int]) -> int:
-    values = [float(value) for value in label_vector]
-    return values.index(max(values))

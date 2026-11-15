@@ -40,3 +40,6 @@ categorize/models/category_transformer_*/
 
 # OCR preview output
 ocr/_preview/
+
+# Generated merged training set
+categorize/data/training_final.csv

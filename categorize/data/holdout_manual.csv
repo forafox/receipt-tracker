@@ -1,0 +1,42 @@
+text,category
+"молоко 3,2%",food
+сыр российский,food
+яйца куриные с1,food
+гречка ядрица,food
+макароны спагетти,food
+"масло сливочное 82,5%",food
+сахар-песок,food
+соль пищевая,food
+филе куриное,food
+помидоры свежие,food
+сметана 20%,food
+кефир 1%,food
+овсяные хлопья,food
+шоколад молочный,food
+печенье овсяное,food
+вода питьевая негазированная,food
+стиральный порошок автомат,household
+губки для посуды,household
+мешки для мусора 30л,household
+чистящий крем,household
+туалетная бумага 12 рулонов,household
+ведро пластиковое,household
+перчатки резиновые,household
+зубная паста,personal_care
+шампунь против перхоти,personal_care
+гель для душа,personal_care
+дезодорант спрей,personal_care
+бритва женская,personal_care
+прокладки ночные,personal_care
+ватные палочки,personal_care
+лак для ногтей,personal_care
+аспирин 500мг,medicine
+парацетамол 500мг,medicine
+йод 5%,medicine
+шприц 5мл,medicine
+капли в нос,medicine
+мазь от ушибов,medicine
+тонометр автоматический,medicine
+круассан с миндалем,cafe
+суп грибной,cafe
+десерт дня,cafe

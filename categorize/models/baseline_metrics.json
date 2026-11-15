@@ -1,0 +1,22 @@
+{
+  "exact_match": 0.8339521452145214,
+  "micro_f1": 0.8784530386740331,
+  "precision_cafe": 0.18604651162790697,
+  "recall_cafe": 0.5454545454545454,
+  "f1_cafe": 0.27745664739884396,
+  "precision_food": 0.80835734870317,
+  "recall_food": 0.9318936877076412,
+  "f1_food": 0.8657407407407408,
+  "precision_household": 0.8908366533864542,
+  "recall_household": 0.9293433083956775,
+  "f1_household": 0.9096826688364524,
+  "precision_medicine": 0.8701612903225806,
+  "recall_medicine": 0.8976705490848585,
+  "f1_medicine": 0.8837018837018836,
+  "precision_personal_care": 0.8746056782334385,
+  "recall_personal_care": 0.9218620116375728,
+  "f1_personal_care": 0.8976123027114529,
+  "macro_f1": 0.7668388486778748,
+  "train_size": 19386.0,
+  "test_size": 4848.0
+}
