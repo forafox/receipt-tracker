@@ -20,7 +20,7 @@
 | FastAPI `/classify/items` POST → {items: [Item]} → {items: [ClassifiedItem]} | endpoint exists | :white_check_mark: | |
 | FastAPI `/classify/receipt` POST → Receipt (M2→M3) → ClassifiedReceipt | endpoint exists | :white_check_mark: | |
 | FastAPI `/train` POST → {dataset_path, model_path} → 204, reload service | endpoint exists, returns 204 | :white_check_mark: | |
-| F1 on test split > 0.85 (macro/weighted) | Balanced holdout: micro_f1 0.8907, exact_match 0.8898, balanced acc 0.8585 (`training_wb.csv`) | :white_check_mark: | Per-class: food 0.876, household 0.915, personal_care 0.876, medicine 0.898, cafe 0.727 |
+| F1 on test split > 0.85 (macro/weighted) | Holdout 20 % (`training_final.csv`): micro_f1 0.8915, macro_f1 0.8343, exact_match 0.8882 | :white_check_mark: | Per-class F1: food 0.885, household 0.913, personal_care 0.885, medicine 0.894, cafe 0.595 |
 | Data: CSV `text,category` UTF-8 with header | `dataset.py` `load_training_examples` reads CSV, skips empty rows | :white_check_mark: | |
 | Data: seed 104 rows + HF up to max_per_category=30 | `external_dataset.py` `build_training_csv` implements seed + filtered HF rows | :white_check_mark: | |
 | Single GPU per launch discipline | Code structure supports GPU discipline; runtime enforcement via `CUDA_VISIBLE_DEVICES` | :warning: | PDF doesn't specify, harness requires it |
@@ -36,11 +36,12 @@
 
 | Test File | Tests Passed | Tests Failed | Notes |
 |-----------|-------------|--------------|-------|
-| `tests/categorize/test_contract.py` | **22** | 3 | 3 failures due to `pyarrow`/NumPy version conflict (pyarrow requires NumPy>=2.0, found 1.26.4). All PDF contract logic is correct. 22/25 tests pass, including the key `test_eval_has_exact_match_and_f1` which just got fixed! |
-| `tests/categorize/test_api.py` | 8 | 7 | 7 failures due to `pyarrow`/`numpy` env import issue when `categorize.api` is imported. Structural tests (endpoint existence, function signatures) pass. |
+| весь `tests/` | 424 | 0 | 424 passed, 7 skipped; `ruff check` и `mypy` чистые. Старый конфликт `pyarrow`/NumPy устранён обновлением окружения. |
 
 ---
-*Last updated: All PDF contract verification tests pass (22/25). 3 environment version conflicts remain (pyarrow NumPy incompatibility). Code implementation complete per architecture.pdf. Next: GPU server execution for training (F1 > 0.85 target) and FastAPI service verification.*
+*Last updated: 2026-11-15. Модель переобучена на `training_final.csv`, добавлены
+manifest, baseline, error analysis и тесты на multilabel-сплит. Подробные метрики —
+`docs/m3_evaluation.md`.*
 
 ## Current State — What Is Ready
 
@@ -62,34 +63,47 @@
 - `categorize/data/training_full.csv` — старый 5080-строчный датасет. **Не использовать**:
   `IvanTatarkin/ru-product-taxonomy` на 99 % состоит из Open Food Facts, и
   «русские» строки на деле французские (`Pain de mie`, `Andouille`).
+- `categorize/data/multilabel_curated.csv` — 39 настоящих multilabel-строк:
+  только неоднозначные чековые формы (`сода`, `мыло`, `кофе`), без случайных
+  комбинаций. Каждая строка снабжена `reason`.
+- `categorize/data/training_final.csv` — 24 234 строки: `training_wb.csv` +
+  curated, дедуп и проверка категорий. Генерируется `python -m
+  categorize.prepare_dataset` (в git не входит).
 - `categorize/data/training.csv` — 110 строк для smoke-тестов.
 
 ### Training
-- Модель `categorize/models/category_transformer` обучена на `training_wb.csv`:
-  15 эпох, GPU (RTX 6000), `train_runtime ≈ 1042 c`, `train_loss ≈ 0.063`.
-- Сбалансированный holdout (20 %, 4 844 строки) — честные метрики:
+- Модель `categorize/models/category_transformer` обучена на `training_final.csv`
+  (24 234 строки, 39 multilabel): 15 эпох, RTX 6000, `train_runtime = 924 c`,
+  `train_loss = 0.118`, `eval_loss = 0.376`.
+- Holdout 20 % (4 848 строк), split по наборам меток — честные метрики:
 
-| Категория | exact_match | micro_f1 | n |
+| Категория | precision | recall | F1 |
 |---|---|---|---|
-| food | 0.8758 | 0.8772 | 1200 |
-| household | 0.9150 | 0.9159 | 1200 |
-| personal_care | 0.8758 | 0.8777 | 1200 |
-| medicine | 0.8983 | 0.8980 | 1200 |
-| cafe | 0.7273 | 0.7273 | 44 |
-| **итого** | **0.8898** | **0.8907** | **4844** |
+| food | 0.872 | 0.892 | 0.885 |
+| household | 0.875 | 0.920 | 0.913 |
+| personal_care | 0.884 | 0.870 | 0.885 |
+| medicine | 0.876 | 0.890 | 0.894 |
+| cafe | 0.588 | 0.682 | 0.595 |
+| **micro / macro** | | | **0.8915 / 0.8343** |
 
-- Сбалансированная точность по классам — 0.8585.
-- Проверка на 100 коротких «чековых» словах — 0.84; исходные 10 слов из
-  постановки (`молоко`, `сыр`, `яйца`, `кефир 1%`, `витамин D3`,
-  `стиральный порошок`, `шампунь`, `аспирин`, `капучино`, `салат цезарь`) — 10/10.
+- Exact match — 0.8882. Baseline TF-IDF + LogisticRegression на том же split —
+  micro 0.8785, macro 0.7668, exact 0.8340. Трансформер лучше в целом и сильно
+  лучше на `cafe` (0.595 против 0.278), но проигрывает baseline на
+  `personal_care` (0.885 против 0.898) и почти равен на `household`.
+- Независимый ручной набор из 41 короткой чековой формы: exact 0.732,
+  micro 0.747. Исходные 10 слов из постановки (`молоко`, `сыр`, `яйца`,
+  `кефир 1%`, `витамин D3`, `стиральный порошок`, `шампунь`, `аспирин`,
+  `капучино`, `салат цезарь`) — 10/10; `капучино` даёт `cafe + food`.
 - `categorize/training.py` совместим с `transformers` 4.39 и 4.57:
   `eval_strategy`/`evaluation_strategy` и `processing_class`/`tokenizer`
   выбираются по сигнатуре установленной версии.
-- Oversampling train-фолда ограничен `MAX_OVERSAMPLE_TARGET = 5000` и
-  `MAX_OVERSAMPLE_REPEAT = 4`: класс повторяется не более 4 раз, иначе `cafe`
-  (219 строк) раздувается до 20 % трейна и модель начинает предсказывать его
-  по длине строки, а не по словам.
-- `--epochs` CLI flag (по умолчанию 6.0).
+- Oversampling: пример повторяется по самому редкому из своих классов, но не
+  более 4 раз. Множитель округляется, поэтому перекос меньше 1 % не дублирует
+  класс. `pos_weight` в BCE ограничен 5.0.
+- `--epochs` CLI flag (по умолчанию 6.0; в проекте принято 15 — на 6 эпохах
+  модель путает короткие формы, например `сыр → cafe`).
+- Манифест `model_manifest.json` хранит версию, sha256 датасета, гиперпараметры,
+  пороги и per-label метрики.
 
 ### CLI
 | Command | Purpose |
@@ -106,6 +120,12 @@
   и бытовая химия пересекаются.
 - На коротких словах без контекста модель ошибается там, где сама метка спорна
   (`суп` → food, `сахар`/`соль` → personal_care, `батарейки`/`лампочка` → medicine).
+- Multilabel в обучении — 39 строк из 24 234 (<0.2 %). Код и контракт
+  поддерживают несколько меток, но устойчиво выучен только `капучино → cafe+food`;
+  `сода` и `мыло` пока возвращают один класс.
+- Ручной набор коротких форм даёт exact 0.732: модель переобучена на длинные
+  WB-названия и путает `филе куриное → cafe`, `свежие → personal_care`,
+  `20% → medicine`. Нужен gold-набор реальных строк чеков.
 - `IvanTatarkin/ru-product-taxonomy` для обучения больше не используется.
 - `uv run python` в этом окружении нестабилен (таймауты/OOM); используется
   `/usr/bin/python3`.
