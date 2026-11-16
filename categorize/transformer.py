@@ -100,6 +100,7 @@ class TransformerCategoryClassifier:
         if not item_name.strip():
             msg = "item name cannot be empty"
             raise ValueError(msg)
+        item_name = normalize_case(item_name)
 
         # Tokenize the item name
         encoded = self._tokenizer(
@@ -137,3 +138,22 @@ class TransformerCategoryClassifier:
         selected.sort(key=lambda score: score.confidence, reverse=True)
 
         return CategoryPrediction(categories=selected)
+
+
+def normalize_case(item_name: str) -> str:
+    """Lowercase a name written entirely in capitals, as receipts print them.
+
+    The model was trained on names written in sentence case. On names in capitals its
+    accuracy drops from 0.98 to 0.42 on a sample of the training set, and lowercasing them
+    brings it back to 0.90. Names already in mixed case are left as they are: lowercasing
+    them lowers the accuracy.
+
+    Args:
+        item_name: Item name as recognized on the receipt.
+
+    Returns:
+        The lowercased name if it has letters and all of them are capitals, else the name.
+    """
+    if any(character.isalpha() for character in item_name) and item_name.isupper():
+        return item_name.lower()
+    return item_name

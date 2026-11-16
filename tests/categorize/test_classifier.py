@@ -1,5 +1,8 @@
+import pytest
+
 from categorize.eval import evaluate
 from categorize.schemas import TrainingExample
+from categorize.transformer import normalize_case
 from common import CategoryPrediction, CategoryScore
 
 
@@ -27,3 +30,17 @@ def test_classifier_eval_reports_accuracy() -> None:
 
     assert result.accuracy == 1
     assert result.examples == len(examples)
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("МОЛОКО 3.2%", "молоко 3.2%"),
+        ("ХЛЕБ", "хлеб"),
+        ("Молоко 3,2% пастеризованное", "Молоко 3,2% пастеризованное"),
+        ("капучино", "капучино"),
+        ("123 456", "123 456"),
+    ],
+)
+def test_normalize_case_lowercases_only_all_caps_names(name: str, expected: str) -> None:
+    assert normalize_case(name) == expected
