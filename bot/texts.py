@@ -31,6 +31,8 @@ class Texts:
         undo_done: Heading of the reply about a deleted receipt.
         undo_empty: Reply sent when there is nothing to delete.
         receipt_count: Label for the number of receipts.
+        by_category: Heading of the spending breakdown by category.
+        no_category: Name of the group of items without a category.
         store: Label for the store name.
         date: Label for the purchase date.
         total: Label for the receipt total.
@@ -66,6 +68,8 @@ class Texts:
     undo_done: str
     undo_empty: str
     receipt_count: str
+    by_category: str
+    no_category: str
     store: str
     date: str
     total: str
@@ -109,6 +113,8 @@ RU = Texts(
     undo_done="Удалён чек:",
     undo_empty="Удалять нечего, сохранённых чеков нет.",
     receipt_count="Чеков",
+    by_category="По категориям",
+    no_category="без категории",
     store="Магазин",
     date="Дата",
     total="Сумма",
@@ -162,6 +168,8 @@ EN = Texts(
     undo_done="Deleted receipt:",
     undo_empty="Nothing to delete, there are no saved receipts.",
     receipt_count="Receipts",
+    by_category="By category",
+    no_category="no category",
     store="Store",
     date="Date",
     total="Total",
@@ -236,14 +244,23 @@ def format_monthly_summary(summary: MonthlySummary, texts: Texts) -> str:
         texts: Localized labels.
 
     Returns:
-        Message with the month total and the number of receipts.
+        Message with the month total, the number of receipts and, when some items have
+        categories, the spending by category from the largest.
     """
     if summary.receipt_count == 0:
         return texts.month_empty
-    return (
-        f"{texts.month_spending} {summary.month:%m.%Y}: {summary.total:.2f}\n"
-        f"{texts.receipt_count}: {summary.receipt_count}"
-    )
+    lines = [
+        f"{texts.month_spending} {summary.month:%m.%Y}: {summary.total:.2f}",
+        f"{texts.receipt_count}: {summary.receipt_count}",
+    ]
+    if any(category is not None for category in summary.by_category):
+        lines.append(f"\n{texts.by_category}:")
+        for category, amount in sorted(
+            summary.by_category.items(), key=lambda pair: pair[1], reverse=True
+        ):
+            name = texts.no_category if category is None else category_name(category, texts)
+            lines.append(f"- {name}: {amount:.2f}")
+    return "\n".join(lines)
 
 
 def format_history(receipts: list[Receipt], texts: Texts) -> str:

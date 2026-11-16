@@ -442,3 +442,35 @@ async def test_categorizer_is_not_called_without_items() -> None:
     await pipeline.process_photo(1, b"image", RECEIVED_AT)
 
     assert categorizer.received is None
+
+
+async def test_monthly_summary_sums_items_by_category() -> None:
+    storage = FakeStorage()
+    in_october = datetime(2026, 10, 5, tzinfo=MOSCOW_TIMEZONE)
+    storage.save(
+        1,
+        Receipt(
+            total=Decimal("150.00"),
+            items=[
+                Item(name="МОЛОКО", sum=Decimal("90.00"), category="food"),
+                Item(name="ШАМПУНЬ", sum=Decimal("50.00"), category="personal_care"),
+                Item(name="???", sum=Decimal("10.00")),
+            ],
+        ),
+        in_october,
+    )
+    storage.save(
+        1,
+        Receipt(
+            total=Decimal("40.00"), items=[Item(name="ХЛЕБ", sum=Decimal("40.00"), category="food")]
+        ),
+        in_october,
+    )
+
+    summary = await make_pipeline("", storage).monthly_summary(1, RECEIVED_AT)
+
+    assert summary.by_category == {
+        "food": Decimal("130.00"),
+        "personal_care": Decimal("50.00"),
+        None: Decimal("10.00"),
+    }

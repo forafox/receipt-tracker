@@ -95,3 +95,28 @@ def test_format_receipt_shows_item_categories() -> None:
 
 def test_every_language_names_every_category() -> None:
     assert RU.category_names.keys() == EN.category_names.keys()
+
+
+def test_format_monthly_summary_lists_categories_from_largest() -> None:
+    summary = MonthlySummary(
+        month=date(2026, 10, 1),
+        receipt_count=2,
+        total=Decimal("190"),
+        by_category={"personal_care": Decimal("50"), None: Decimal("10"), "food": Decimal("130")},
+    )
+
+    assert format_monthly_summary(summary, RU) == (
+        "Расходы за 10.2026: 190.00\nЧеков: 2\n"
+        "\nПо категориям:\n- продукты: 130.00\n- уход: 50.00\n- без категории: 10.00"
+    )
+
+
+def test_format_monthly_summary_hides_breakdown_without_categories() -> None:
+    summary = MonthlySummary(
+        month=date(2026, 10, 1),
+        receipt_count=1,
+        total=Decimal("10"),
+        by_category={None: Decimal("10")},
+    )
+
+    assert format_monthly_summary(summary, EN) == "Spending for 10.2026: 10.00\nReceipts: 1"

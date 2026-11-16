@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, tzinfo
 from decimal import Decimal
 from functools import partial
@@ -56,11 +56,15 @@ class MonthlySummary:
         month: First day of the month.
         receipt_count: Number of saved receipts.
         total: Sum of receipt totals; receipts without a total are not counted.
+        by_category: Sum of item amounts per category code, items without a category under
+            None. Items are recognized less reliably than totals, so these sums need not add
+            up to ``total``.
     """
 
     month: date
     receipt_count: int
     total: Decimal
+    by_category: dict[str | None, Decimal] = field(default_factory=dict)
 
 
 class ReceiptPipeline:
@@ -220,7 +224,13 @@ class ReceiptPipeline:
         total = sum(
             (receipt.total for receipt in receipts if receipt.total is not None), Decimal(0)
         )
-        return MonthlySummary(month=start.date(), receipt_count=len(receipts), total=total)
+        by_category: dict[str | None, Decimal] = {}
+        for receipt in receipts:
+            for item in receipt.items:
+                by_category[item.category] = by_category.get(item.category, Decimal(0)) + item.sum
+        return MonthlySummary(
+            month=start.date(), receipt_count=len(receipts), total=total, by_category=by_category
+        )
 
     async def recent_receipts(self, user_id: int) -> list[Receipt]:
         """List a user's most recent receipts.
