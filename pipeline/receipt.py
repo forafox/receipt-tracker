@@ -11,6 +11,7 @@ from common.contracts import Receipt
 from common.ocr import OcrEngine
 from extract import parse_ocr_result
 from ocr import ImageDecodeError, ImageTooLargeError, OcrError
+from pipeline.categories import CategoryUnavailable, ItemCategorizer
 from storage import ReceiptStorage
 
 logger = logging.getLogger(__name__)
@@ -69,17 +70,25 @@ class ReceiptPipeline:
     save it anyway. Only the latest such receipt per user is kept, and it is lost on restart.
     """
 
-    def __init__(self, recognizer: OcrEngine, storage: ReceiptStorage, timezone: tzinfo) -> None:
+    def __init__(
+        self,
+        recognizer: OcrEngine,
+        storage: ReceiptStorage,
+        timezone: tzinfo,
+        categorizer: ItemCategorizer | None = None,
+    ) -> None:
         """Create a pipeline.
 
         Args:
             recognizer: OCR step that returns text blocks with their positions.
             storage: Storage for parsed receipts.
             timezone: Timezone of the local time printed on receipts and of month boundaries.
+            categorizer: Step that assigns item categories, or None to save items without them.
         """
         self._recognizer = recognizer
         self._storage = storage
         self._timezone = timezone
+        self._categorizer = categorizer
         self._pending_duplicates: dict[int, tuple[int, Receipt, datetime]] = {}
         self._pending_ids = count(1)
 
@@ -122,16 +131,19 @@ class ReceiptPipeline:
                 len(blocks.blocks),
             )
             raise ReceiptUnreadable
+        await self._categorize(receipt)
+        categorized = time.perf_counter()
         purchased_at = receipt.datetime or received_at
         saved = await asyncio.to_thread(self._storage.save, user_id, receipt, purchased_at)
         finished = time.perf_counter()
         logger.info(
-            "Processed receipt for user %s: ocr %.2fs, parse %.2fs, save %.2fs, "
-            "items %d, warnings %s, duplicate %s",
+            "Processed receipt for user %s: ocr %.2fs, parse %.2fs, categories %.2fs, "
+            "save %.2fs, items %d, warnings %s, duplicate %s",
             user_id,
             recognized - started,
             parsed - recognized,
-            finished - parsed,
+            categorized - parsed,
+            finished - categorized,
             len(receipt.items),
             receipt.warnings,
             not saved,
@@ -141,6 +153,18 @@ class ReceiptPipeline:
             self._pending_duplicates[user_id] = (pending_id, receipt, purchased_at)
             raise ReceiptAlreadySaved(pending_id)
         return receipt
+
+    async def _categorize(self, receipt: Receipt) -> None:
+        # Categories are a bonus: without them the receipt is still worth saving.
+        if self._categorizer is None or not receipt.items:
+            return
+        try:
+            categories = await self._categorizer.categorize([item.name for item in receipt.items])
+        except CategoryUnavailable as error:
+            logger.warning("Saving receipt without categories: %s", error)
+            return
+        for item, category in zip(receipt.items, categories, strict=True):
+            item.category = category
 
     async def save_duplicate(self, user_id: int, pending_id: int) -> Receipt | None:
         """Save a receipt rejected as a duplicate, after the user confirmed it.

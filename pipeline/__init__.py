@@ -1,3 +1,4 @@
+from pipeline.categories import CategoryApiClient, CategoryUnavailable, ItemCategorizer
 from pipeline.receipt import (
     MonthlySummary,
     ReceiptAlreadySaved,
@@ -8,6 +9,9 @@ from pipeline.receipt import (
 )
 
 __all__ = [
+    "CategoryApiClient",
+    "CategoryUnavailable",
+    "ItemCategorizer",
     "MonthlySummary",
     "ReceiptAlreadySaved",
     "ReceiptImageTooLarge",

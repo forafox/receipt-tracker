@@ -11,6 +11,7 @@ from common.contracts import Item, Receipt
 from common.ocr import OcrResult, TextBlock
 from ocr import ImageDecodeError, ImageTooLargeError, OcrEngineUnavailableError
 from pipeline import (
+    CategoryUnavailable,
     MonthlySummary,
     ReceiptAlreadySaved,
     ReceiptImageTooLarge,
@@ -385,3 +386,59 @@ async def test_oversized_image_is_reported_separately_from_unreadable() -> None:
         await pipeline.process_photo(1, b"image", RECEIVED_AT)
 
     assert storage.saved == []
+
+
+ITEMS_TEXT = (
+    "ПЯТЁРОЧКА\n"
+    "05.10.2026 18:20\n"
+    "МОЛОКО 3.2%      89.90\n"
+    "ШАМПУНЬ          45.00\n"
+    "ИТОГО           134.90"
+)
+
+
+class FakeCategorizer:
+    def __init__(self, categories: list[str | None] | None = None) -> None:
+        self.categories = categories
+        self.received: list[str] | None = None
+
+    async def categorize(self, names: list[str]) -> list[str | None]:
+        self.received = names
+        if self.categories is None:
+            raise CategoryUnavailable("connection refused")
+        return self.categories
+
+
+async def test_items_get_categories_before_saving() -> None:
+    storage = FakeStorage()
+    categorizer = FakeCategorizer(["food", "personal_care"])
+    pipeline = ReceiptPipeline(FakeRecognizer(ITEMS_TEXT), storage, MOSCOW_TIMEZONE, categorizer)
+
+    receipt = await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert categorizer.received == ["МОЛОКО 3.2%", "ШАМПУНЬ"]
+    assert [item.category for item in receipt.items] == ["food", "personal_care"]
+    assert [item.category for item in storage.saved[0][1].items] == ["food", "personal_care"]
+
+
+async def test_receipt_is_saved_without_categories_when_api_fails() -> None:
+    storage = FakeStorage()
+    pipeline = ReceiptPipeline(
+        FakeRecognizer(ITEMS_TEXT), storage, MOSCOW_TIMEZONE, FakeCategorizer(None)
+    )
+
+    receipt = await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert [item.category for item in receipt.items] == [None, None]
+    assert len(storage.saved) == 1
+
+
+async def test_categorizer_is_not_called_without_items() -> None:
+    categorizer = FakeCategorizer(["food"])
+    pipeline = ReceiptPipeline(
+        FakeRecognizer(DUPLICATE_TEXT), FakeStorage(), MOSCOW_TIMEZONE, categorizer
+    )
+
+    await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert categorizer.received is None
