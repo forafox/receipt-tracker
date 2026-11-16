@@ -83,6 +83,7 @@ def test_load_validates_contracts_without_inferring_or_normalizing(tmp_path: Pat
         "quantity": None,
         "price": None,
         "sum": Decimal("-1.00"),
+        "category": None,
     }
     assert sample.expected.warnings == ["independent_annotation"]
     assert path.read_bytes() == before

@@ -35,6 +35,9 @@ class Item(BaseModel):
         quantity: Number of units or weight, if available.
         price: Price per unit, if available.
         sum: Final amount for the receipt line.
+        category: Category code from the category model (``food``, ``household``,
+            ``personal_care``, ``medicine``, ``cafe``), or None when the item was not
+            classified.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -43,6 +46,7 @@ class Item(BaseModel):
     quantity: Decimal | None = None
     price: Decimal | None = None
     sum: Decimal
+    category: str | None = None
 
 
 class Receipt(BaseModel):

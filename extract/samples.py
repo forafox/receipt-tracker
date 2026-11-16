@@ -14,6 +14,10 @@ class SampleLoadError(ValueError):
     """An invalid evaluation record, with its source path and line number."""
 
 
+# Filled by the category model after extraction, so references do not annotate it.
+_NOT_EXTRACTED_ITEM_FIELDS = {"category"}
+
+
 class EvaluationSample(BaseModel):
     """An OCR result paired with an independently annotated reference.
 
@@ -43,7 +47,7 @@ class EvaluationSample(BaseModel):
         if missing:
             raise ValueError(f"expected is missing annotations: {', '.join(sorted(missing))}")
         for index, item in enumerate(value.items):
-            missing = Item.model_fields.keys() - item.model_fields_set
+            missing = Item.model_fields.keys() - _NOT_EXTRACTED_ITEM_FIELDS - item.model_fields_set
             if missing:
                 raise ValueError(
                     f"expected.items[{index}] is missing annotations: {', '.join(sorted(missing))}"

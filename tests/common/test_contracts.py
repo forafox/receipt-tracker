@@ -117,3 +117,13 @@ def test_receipt_warning_survives_json_round_trip() -> None:
 
     assert restored.warnings == ["items_incomplete"]
     assert ReceiptWarning.ITEMS_INCOMPLETE in restored.warnings
+
+
+def test_item_category_is_optional_for_stored_receipts() -> None:
+    stored = '{"items": [{"name": "ХЛЕБ", "sum": "45.00"}]}'
+
+    receipt = Receipt.model_validate_json(stored)
+    receipt.items[0].category = "food"
+
+    assert Receipt.model_validate_json(stored).items[0].category is None
+    assert Receipt.model_validate_json(receipt.model_dump_json()).items[0].category == "food"
