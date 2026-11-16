@@ -76,3 +76,22 @@ def test_format_receipt_warns_when_items_are_incomplete() -> None:
     )
 
     assert format_receipt(receipt, RU).endswith(f"\n\n{RU.items_incomplete}")
+
+
+def test_format_receipt_shows_item_categories() -> None:
+    receipt = Receipt(
+        store="ЛЕНТА",
+        items=[
+            Item(name="МОЛОКО", sum=Decimal("89.9"), category="food"),
+            Item(name="ХЛЕБ", sum=Decimal("45")),
+            Item(name="ЗОНТ", sum=Decimal("500"), category="unknown_code"),
+        ],
+    )
+
+    assert format_receipt(receipt, RU).endswith(
+        "Покупки:\n- МОЛОКО: 89.90 (продукты)\n- ХЛЕБ: 45.00\n- ЗОНТ: 500.00 (unknown_code)"
+    )
+
+
+def test_every_language_names_every_category() -> None:
+    assert RU.category_names.keys() == EN.category_names.keys()

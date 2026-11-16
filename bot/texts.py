@@ -1,6 +1,7 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 
-from common.contracts import Receipt, ReceiptWarning
+from common.contracts import Item, Receipt, ReceiptWarning
 from pipeline import MonthlySummary
 
 
@@ -37,6 +38,7 @@ class Texts:
         items_mismatch: Note shown when item sums do not add up to the total.
         items_incomplete: Note shown when some items could not be recognized.
         not_found: Placeholder for a field that was not recognized.
+        category_names: Category names by category code.
         help_command: Localized help command description.
         month_command: Localized monthly report command description.
         history_command: Localized recent receipts command description.
@@ -71,6 +73,7 @@ class Texts:
     items_mismatch: str
     items_incomplete: str
     not_found: str
+    category_names: Mapping[str, str]
     help_command: str
     month_command: str
     history_command: str
@@ -116,6 +119,13 @@ RU = Texts(
     ),
     items_incomplete="Часть покупок распознать не удалось, список может быть неполным.",
     not_found="не распознано",
+    category_names={
+        "food": "продукты",
+        "household": "быт",
+        "personal_care": "уход",
+        "medicine": "лекарства",
+        "cafe": "кафе",
+    },
     help_command="Справка",
     month_command="Расходы за месяц",
     history_command="Последние чеки",
@@ -162,6 +172,13 @@ EN = Texts(
     ),
     items_incomplete="Some items could not be recognized, the list may be incomplete.",
     not_found="not recognized",
+    category_names={
+        "food": "groceries",
+        "household": "household",
+        "personal_care": "personal care",
+        "medicine": "medicine",
+        "cafe": "cafe",
+    },
     help_command="Help",
     month_command="Spending this month",
     history_command="Recent receipts",
@@ -203,7 +220,7 @@ def format_receipt(receipt: Receipt, texts: Texts) -> str:
     lines = [f"{texts.store}: {store}", f"{texts.date}: {date}", f"{texts.total}: {total}"]
     if receipt.items:
         lines.append(f"\n{texts.items}:")
-        lines.extend(f"- {item.name}: {item.sum:.2f}" for item in receipt.items)
+        lines.extend(_format_item(item, texts) for item in receipt.items)
     if ReceiptWarning.ITEMS_INCOMPLETE in receipt.warnings:
         lines.append(f"\n{texts.items_incomplete}")
     if ReceiptWarning.ITEMS_TOTAL_MISMATCH in receipt.warnings:
@@ -247,3 +264,23 @@ def format_history(receipts: list[Receipt], texts: Texts) -> str:
         total = f"{receipt.total:.2f}" if receipt.total is not None else texts.not_found
         lines.append(f"{date}, {receipt.store or texts.not_found}, {total}")
     return "\n".join(lines)
+
+
+def category_name(category: str, texts: Texts) -> str:
+    """Translate a category code for the user.
+
+    Args:
+        category: Category code from the category model.
+        texts: Localized labels.
+
+    Returns:
+        Localized category name, or the code itself if it is unknown.
+    """
+    return texts.category_names.get(category, category)
+
+
+def _format_item(item: Item, texts: Texts) -> str:
+    line = f"- {item.name}: {item.sum:.2f}"
+    if item.category is None:
+        return line
+    return f"{line} ({category_name(item.category, texts)})"
