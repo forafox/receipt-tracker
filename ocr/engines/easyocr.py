@@ -8,6 +8,7 @@ from common.ocr import OcrResult, TextBlock
 from ocr.core.errors import OcrEngineUnavailableError
 from ocr.core.image import decode_image
 from ocr.core.ordering import blocks_to_text
+from ocr.core.quality import QualityThresholds, ensure_quality
 
 
 class EasyOcrEngine:
@@ -29,6 +30,7 @@ class EasyOcrEngine:
         languages: Sequence[str] | None = None,
         gpu: bool = False,
         min_confidence: float = 0.0,
+        quality: QualityThresholds | None = None,
     ) -> None:
         """Create an EasyOCR engine.
 
@@ -36,10 +38,13 @@ class EasyOcrEngine:
             languages: EasyOCR language codes; defaults to Russian and English.
             gpu: Whether EasyOCR should use the GPU.
             min_confidence: Minimum block confidence in the ``0..1`` range to keep a block.
+            quality: Optional quality gate applied after decoding and before loading
+                the reader; ``None`` disables the gate.
         """
         self._languages = list(languages) if languages is not None else ["ru", "en"]
         self._gpu = gpu
         self._min_confidence = min_confidence
+        self._quality = quality
         self._reader: Any | None = None
         self._reader_lock = threading.Lock()
 
@@ -54,9 +59,12 @@ class EasyOcrEngine:
 
         Raises:
             ImageDecodeError: If the image bytes cannot be decoded.
+            ImageQualityError: If the configured quality gate rejects the image.
             OcrEngineUnavailableError: If EasyOCR cannot be loaded or fails during recognition.
         """
         array = decode_image(image)
+        if self._quality is not None:
+            ensure_quality(array, self._quality)
         height, width = array.shape[:2]
         reader = self._reader_instance()
         try:

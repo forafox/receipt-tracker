@@ -8,7 +8,8 @@ import cv2
 import numpy as np
 import pytest
 
-from ocr.core.errors import ImageDecodeError, OcrEngineUnavailableError
+from ocr.core.errors import ImageDecodeError, ImageQualityError, OcrEngineUnavailableError
+from ocr.core.quality import QualityThresholds
 from ocr.engines.easyocr import EasyOcrEngine
 
 
@@ -72,5 +73,27 @@ def test_invalid_image_is_reported_before_loading_reader(
 
     with pytest.raises(ImageDecodeError):
         EasyOcrEngine().recognize_blocks(b"not an image")
+
+    assert not reader_created
+
+
+def test_poor_quality_is_reported_before_loading_reader(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reader_created = False
+
+    class Reader:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            nonlocal reader_created
+            reader_created = True
+
+        def readtext(self, image: np.ndarray) -> list[tuple[Any, str, float]]:
+            return []
+
+    _install_fake_easyocr(monkeypatch, Reader)
+    engine = EasyOcrEngine(quality=QualityThresholds(min_sharpness=1e9))
+
+    with pytest.raises(ImageQualityError):
+        engine.recognize_blocks(_image_bytes())
 
     assert not reader_created

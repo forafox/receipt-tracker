@@ -9,7 +9,7 @@ import pytest
 
 from common.contracts import Item, Receipt
 from common.ocr import OcrResult, TextBlock
-from ocr import ImageDecodeError, ImageTooLargeError, OcrEngineUnavailableError
+from ocr import ImageDecodeError, ImageQualityError, ImageTooLargeError, OcrEngineUnavailableError
 from pipeline import (
     MonthlySummary,
     ReceiptAlreadySaved,
@@ -171,6 +171,20 @@ async def test_undecodable_image_is_unreadable() -> None:
 
     with pytest.raises(ReceiptUnreadable):
         await pipeline.process_photo(1, b"not an image", RECEIVED_AT)
+
+    assert storage.saved == []
+
+
+async def test_low_quality_image_is_unreadable() -> None:
+    storage = FakeStorage()
+    pipeline = ReceiptPipeline(
+        FailingRecognizer(ImageQualityError("image is too blurry")),
+        storage,
+        MOSCOW_TIMEZONE,
+    )
+
+    with pytest.raises(ReceiptUnreadable):
+        await pipeline.process_photo(1, b"blurry", RECEIVED_AT)
 
     assert storage.saved == []
 

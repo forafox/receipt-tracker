@@ -2,6 +2,7 @@ from common.ocr import OcrEngine, OcrResult, TextBlock
 from ocr.core.config import OcrSettings
 from ocr.core.errors import (
     ImageDecodeError,
+    ImageQualityError,
     ImageTooLargeError,
     OcrEngineUnavailableError,
     OcrError,
@@ -12,6 +13,7 @@ from ocr.service import OcrService, build_default_ocr_service
 
 __all__ = [
     "ImageDecodeError",
+    "ImageQualityError",
     "ImageTooLargeError",
     "OcrEngine",
     "OcrEngineUnavailableError",

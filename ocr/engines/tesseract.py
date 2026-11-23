@@ -9,6 +9,7 @@ from common.ocr import OcrResult, TextBlock
 from ocr.core.errors import OcrEngineUnavailableError
 from ocr.core.image import decode_image
 from ocr.core.ordering import blocks_to_text
+from ocr.core.quality import QualityThresholds, ensure_quality
 
 _WORD_LEVEL = 5
 
@@ -28,6 +29,7 @@ class TesseractEngine:
         languages: str = "rus+eng",
         min_confidence: float = 0.0,
         tesseract_config: str = "",
+        quality: QualityThresholds | None = None,
     ) -> None:
         """Create a Tesseract engine.
 
@@ -35,10 +37,13 @@ class TesseractEngine:
             languages: Tesseract language string, for example ``rus+eng``.
             min_confidence: Minimum block confidence in the ``0..1`` range to keep a block.
             tesseract_config: Extra Tesseract configuration flags.
+            quality: Optional quality gate applied after decoding and before loading
+                the backend; ``None`` disables the gate.
         """
         self._languages = languages
         self._min_confidence = min_confidence
         self._tesseract_config = tesseract_config
+        self._quality = quality
         self._pytesseract: Any | None = None
         self._module_lock = threading.Lock()
 
@@ -52,11 +57,14 @@ class TesseractEngine:
             Recognized line blocks with absolute-pixel bounding boxes.
 
         Raises:
+            ImageQualityError: If the configured quality gate rejects the image.
             OcrEngineUnavailableError: If ``pytesseract`` or the Tesseract binary is missing.
         """
-        pytesseract = self._module()
         array = decode_image(image)
+        if self._quality is not None:
+            ensure_quality(array, self._quality)
         height, width = array.shape[:2]
+        pytesseract = self._module()
         rgb = cv2.cvtColor(array, cv2.COLOR_BGR2RGB)
         try:
             data = pytesseract.image_to_data(
