@@ -9,7 +9,7 @@ from common.ocr import OcrResult, TextBlock
 from ocr.core.errors import ImageDecodeError, ImageTooLargeError
 from ocr.core.geometry import axis_aligned, iou
 from ocr.core.image import decode_image
-from ocr.core.ordering import blocks_to_text
+from ocr.core.ordering import blocks_to_text, group_blocks_into_lines
 
 
 def _block(text: str, x1: float, y1: float, x2: float, y2: float) -> TextBlock:
@@ -74,6 +74,21 @@ def test_blocks_to_text_separates_distant_blocks() -> None:
     result = OcrResult(blocks=[_block("верх", 0, 0, 20, 10), _block("низ", 0, 50, 20, 60)])
 
     assert blocks_to_text(result) == "верх\nниз"
+
+
+def test_group_blocks_into_lines_orders_lines_and_blocks() -> None:
+    blocks = [
+        _block("право", 50, 0, 90, 10),
+        _block("низ", 0, 20, 80, 30),
+        _block("лево", 0, 0, 40, 10),
+    ]
+
+    lines = group_blocks_into_lines(blocks)
+
+    assert [[block.text for block in line] for line in lines] == [
+        ["лево", "право"],
+        ["низ"],
+    ]
 
 
 def test_decode_image_rejects_garbage() -> None:

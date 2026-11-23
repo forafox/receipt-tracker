@@ -16,6 +16,9 @@ class OcrSettings(BaseSettings):
         quality_min_sharpness: Minimum variance of the Laplacian of the grayscale image.
         quality_min_contrast: Minimum standard deviation of grayscale pixel values.
         quality_max_glare_ratio: Maximum share of near-saturated pixels.
+        postprocess_enabled: Whether to filter tiny and overlapping blocks and sort them.
+        postprocess_min_box_area: Minimum axis-aligned box area in pixels to keep a block.
+        postprocess_nms_iou: Maximum IoU with a stronger block before a block is suppressed.
     """
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="OCR_", extra="ignore")
@@ -30,3 +33,6 @@ class OcrSettings(BaseSettings):
     quality_min_sharpness: float = Field(default=50.0, ge=0)
     quality_min_contrast: float = Field(default=20.0, ge=0)
     quality_max_glare_ratio: float = Field(default=0.35, ge=0, le=1)
+    postprocess_enabled: bool = True
+    postprocess_min_box_area: float = Field(default=9.0, ge=0)
+    postprocess_nms_iou: float = Field(default=0.5, gt=0, le=1)

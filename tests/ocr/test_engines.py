@@ -9,6 +9,7 @@ import pytest
 from common.ocr import OcrEngine, OcrResult, TextBlock
 from ocr.core.config import OcrSettings
 from ocr.core.ordering import blocks_to_text
+from ocr.core.postprocess import PostprocessSettings
 from ocr.core.quality import QualityThresholds
 from ocr.engines.easyocr import EasyOcrEngine
 from ocr.engines.factory import build_ocr_engine
@@ -67,6 +68,26 @@ def test_factory_can_disable_quality_gate() -> None:
 
     assert isinstance(engine, EasyOcrEngine)
     assert engine._quality is None
+
+
+def test_factory_wires_postprocess_settings() -> None:
+    settings = OcrSettings(
+        engine="tesseract",
+        postprocess_min_box_area=4.0,
+        postprocess_nms_iou=0.3,
+    )
+
+    engine = build_ocr_engine(settings)
+
+    assert isinstance(engine, TesseractEngine)
+    assert engine._postprocess == PostprocessSettings(4.0, 0.3)
+
+
+def test_factory_can_disable_postprocess() -> None:
+    engine = build_ocr_engine(OcrSettings(engine="easyocr", postprocess_enabled=False))
+
+    assert isinstance(engine, EasyOcrEngine)
+    assert engine._postprocess is None
 
 
 def test_importing_ocr_does_not_import_engine_dependencies() -> None:
