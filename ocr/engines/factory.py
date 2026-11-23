@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from common.ocr import OcrEngine
 from ocr.core.config import OcrSettings
+from ocr.core.postprocess import PostprocessSettings
 
 
 def build_ocr_engine(settings: OcrSettings | None = None) -> OcrEngine:
@@ -24,6 +25,7 @@ def build_ocr_engine(settings: OcrSettings | None = None) -> OcrEngine:
             languages=resolved.tesseract_languages,
             min_confidence=resolved.min_confidence,
             tesseract_config=resolved.tesseract_config,
+            postprocess=_postprocess_settings(resolved),
         )
     if resolved.engine == "easyocr":
         from ocr.engines.easyocr import EasyOcrEngine
@@ -32,5 +34,15 @@ def build_ocr_engine(settings: OcrSettings | None = None) -> OcrEngine:
             languages=resolved.easyocr_languages,
             gpu=resolved.gpu,
             min_confidence=resolved.min_confidence,
+            postprocess=_postprocess_settings(resolved),
         )
     raise ValueError(f"Unknown OCR engine: {resolved.engine!r}")
+
+
+def _postprocess_settings(settings: OcrSettings) -> PostprocessSettings | None:
+    if not settings.postprocess_enabled:
+        return None
+    return PostprocessSettings(
+        min_box_area=settings.postprocess_min_box_area,
+        nms_iou_threshold=settings.postprocess_nms_iou,
+    )

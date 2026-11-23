@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from ocr.core.errors import ImageDecodeError, OcrEngineUnavailableError
+from ocr.core.postprocess import PostprocessSettings
 from ocr.engines.easyocr import EasyOcrEngine
 
 
@@ -74,3 +75,28 @@ def test_invalid_image_is_reported_before_loading_reader(
         EasyOcrEngine().recognize_blocks(b"not an image")
 
     assert not reader_created
+
+
+def test_postprocess_filters_duplicates_and_tiny_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    quad = [[0, 0], [10, 0], [10, 10], [0, 10]]
+    tiny_quad = [[20, 20], [22, 20], [22, 22], [20, 22]]
+
+    class Reader:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def readtext(self, image: np.ndarray) -> list[tuple[Any, str, float]]:
+            return [
+                (quad, "ИТОГО", 0.9),
+                (quad, "ИТОГО", 0.8),
+                (tiny_quad, "шум", 0.9),
+            ]
+
+    _install_fake_easyocr(monkeypatch, Reader)
+    engine = EasyOcrEngine(postprocess=PostprocessSettings())
+
+    result = engine.recognize_blocks(_image_bytes())
+
+    assert [block.text for block in result.blocks] == ["ИТОГО"]

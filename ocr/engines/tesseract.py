@@ -9,6 +9,7 @@ from common.ocr import OcrResult, TextBlock
 from ocr.core.errors import OcrEngineUnavailableError
 from ocr.core.image import decode_image
 from ocr.core.ordering import blocks_to_text
+from ocr.core.postprocess import PostprocessSettings, postprocess_blocks
 
 _WORD_LEVEL = 5
 
@@ -28,6 +29,7 @@ class TesseractEngine:
         languages: str = "rus+eng",
         min_confidence: float = 0.0,
         tesseract_config: str = "",
+        postprocess: PostprocessSettings | None = None,
     ) -> None:
         """Create a Tesseract engine.
 
@@ -35,10 +37,13 @@ class TesseractEngine:
             languages: Tesseract language string, for example ``rus+eng``.
             min_confidence: Minimum block confidence in the ``0..1`` range to keep a block.
             tesseract_config: Extra Tesseract configuration flags.
+            postprocess: Optional filtering and reading-order settings; ``None`` returns
+                engine blocks unchanged.
         """
         self._languages = languages
         self._min_confidence = min_confidence
         self._tesseract_config = tesseract_config
+        self._postprocess = postprocess
         self._pytesseract: Any | None = None
         self._module_lock = threading.Lock()
 
@@ -69,11 +74,10 @@ class TesseractEngine:
             raise OcrEngineUnavailableError("tesseract binary not found") from exc
         except pytesseract.TesseractError as exc:
             raise OcrEngineUnavailableError(f"Tesseract failed: {exc}") from exc
-        return OcrResult(
-            blocks=_line_blocks(data, self._min_confidence),
-            image_width=width,
-            image_height=height,
-        )
+        blocks = _line_blocks(data, self._min_confidence)
+        if self._postprocess is not None:
+            blocks = postprocess_blocks(blocks, self._postprocess)
+        return OcrResult(blocks=blocks, image_width=width, image_height=height)
 
     def recognize(self, image: bytes) -> str:
         """Recognize receipt text as plain text.

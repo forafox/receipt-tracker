@@ -8,6 +8,7 @@ from common.ocr import OcrResult, TextBlock
 from ocr.core.errors import OcrEngineUnavailableError
 from ocr.core.image import decode_image
 from ocr.core.ordering import blocks_to_text
+from ocr.core.postprocess import PostprocessSettings, postprocess_blocks
 
 
 class EasyOcrEngine:
@@ -29,6 +30,7 @@ class EasyOcrEngine:
         languages: Sequence[str] | None = None,
         gpu: bool = False,
         min_confidence: float = 0.0,
+        postprocess: PostprocessSettings | None = None,
     ) -> None:
         """Create an EasyOCR engine.
 
@@ -36,10 +38,13 @@ class EasyOcrEngine:
             languages: EasyOCR language codes; defaults to Russian and English.
             gpu: Whether EasyOCR should use the GPU.
             min_confidence: Minimum block confidence in the ``0..1`` range to keep a block.
+            postprocess: Optional filtering and reading-order settings; ``None`` returns
+                engine blocks unchanged.
         """
         self._languages = list(languages) if languages is not None else ["ru", "en"]
         self._gpu = gpu
         self._min_confidence = min_confidence
+        self._postprocess = postprocess
         self._reader: Any | None = None
         self._reader_lock = threading.Lock()
 
@@ -77,6 +82,8 @@ class EasyOcrEngine:
                     confidence=score,
                 )
             )
+        if self._postprocess is not None:
+            blocks = postprocess_blocks(blocks, self._postprocess)
         return OcrResult(blocks=blocks, image_width=width, image_height=height)
 
     def recognize(self, image: bytes) -> str:
