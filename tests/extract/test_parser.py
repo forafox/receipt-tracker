@@ -123,6 +123,26 @@ def test_subtotal_label_is_not_a_total() -> None:
     assert receipt.total is None
 
 
+def test_bank_sum_is_used_when_total_amount_is_missing() -> None:
+    receipt = parse_receipt(
+        "ПЯТЁРОЧКА\n04.01.2022 14:04\n"
+        "ОКРУГЛЕНИЕ: ИТОГ:\n"
+        "умна (Руб) : 1399.37, Комиссия за операцию 0 Руб",
+        timezone=MOSCOW_TIMEZONE,
+    )
+
+    assert receipt.total == Decimal("1399.37")
+
+
+def test_bank_sum_does_not_override_total_label() -> None:
+    receipt = parse_receipt(
+        "ПЯТЁРОЧКА\n04.01.2022 14:04\nИТОГО 100.00\nСумма (Руб): 200.00",
+        timezone=MOSCOW_TIMEZONE,
+    )
+
+    assert receipt.total == Decimal("100.00")
+
+
 def test_invalid_datetime_does_not_crash_parsing() -> None:
     receipt = parse_receipt(
         "ЛЕНТА\n35.15.2026 25:90\nИТОГО 10,00",

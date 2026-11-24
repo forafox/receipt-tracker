@@ -6,6 +6,7 @@ from common.ocr import OcrResult
 from extract._text import (
     _AMOUNT_PATTERN,
     _DATETIME_PATTERN,
+    _extract_bank_sum,
     _extract_total,
     _is_total_line,
 )
@@ -91,6 +92,8 @@ def _parse_receipt_fields(text: str, lines: list[str], timezone: tzinfo) -> Rece
     store = _extract_store(lines)
     receipt_datetime = _extract_datetime(text, timezone)
     total = _extract_total(lines)
+    if total is None:
+        total = _extract_bank_sum(lines)
 
     warnings: list[str] = []
     if store is None:

@@ -24,6 +24,7 @@ _TOTAL_LABEL_PATTERN = re.compile(
     r"(?<!\w)(?:(?:всего\s+)?к\s+оплате|итог(?:о)?)\b",
     re.IGNORECASE,
 )
+_SUM_RUB_PATTERN = re.compile(r"\(\s*руб\.?\s*\)", re.IGNORECASE)
 
 
 def _has_service_prefix(line: str, prefix: str) -> bool:
@@ -45,6 +46,23 @@ def _extract_total(lines: list[str]) -> Decimal | None:
                 return _parse_decimal(match.group())
             except InvalidOperation:
                 continue
+    return None
+
+
+def _extract_bank_sum(lines: list[str]) -> Decimal | None:
+    # Bank receipts repeat the paid amount on the "Сумма (Руб)" line. Some
+    # layouts lose the total amount column, so use this only as a fallback.
+    for line in reversed(lines):
+        marker = _SUM_RUB_PATTERN.search(line)
+        if marker is None:
+            continue
+        match = _AMOUNT_PATTERN.search(line[marker.end() :])
+        if match is None:
+            continue
+        try:
+            return _parse_decimal(match.group())
+        except InvalidOperation:
+            continue
     return None
 
 
