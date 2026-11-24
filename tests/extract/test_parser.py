@@ -171,6 +171,7 @@ def test_datetime_extraction_skips_invalid_candidate() -> None:
         ("К ОПЛАТЕ 1 244,50", Decimal("1244.50")),
         ("к оплате: 2\u00a0030.00", Decimal("2030.00")),
         ("К   ОПЛАТЕ     842,00", Decimal("842.00")),
+        ("ИТОГО 772.00,", Decimal("772.00")),
     ],
 )
 def test_total_formats_are_supported(total_line: str, expected: Decimal) -> None:
@@ -204,7 +205,7 @@ def test_trailing_amount_is_preferred_on_total_line(line: str) -> None:
     assert receipt.total == Decimal("144.98")
 
 
-@pytest.mark.parametrize("amount", ["--12.99", "12.999"])
+@pytest.mark.parametrize("amount", ["--12.99", "12.999", "12.99.00", "12.99, 00"])
 def test_malformed_total_amount_is_not_partially_accepted(amount: str) -> None:
     receipt = parse_receipt(f"МАГАЗИН\n05.10.2026 18:20\nИТОГО {amount}", timezone=MOSCOW_TIMEZONE)
 

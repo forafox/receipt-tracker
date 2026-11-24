@@ -210,6 +210,58 @@ def test_adjustment_summaries_before_total_are_not_purchased_items(
 
 
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+@pytest.mark.parametrize(
+    "tax",
+    [
+        "i на добавленную стоимость 18% 152.48",
+        "Налог на добавленную стоиность 18% 152.48",
+        "Сумма НДС 20/120 152.48",
+        "Налог на добавленную стоимость 18 % 152.48",
+        "i на добавленную стоимость 18 % 152.48",
+    ],
+)
+def test_fuel_tax_and_loyalty_summaries_are_not_purchases(ocr: bool, tax: str) -> None:
+    receipt = _parse(
+        HEADER + "БЕНЗИН 999.60\n" + tax + "\n"
+        "Начислено баллов: 20.00\nПотрачено баллов: 0.00\nВсего баллов: 214.00\n"
+        "ИТОГ 999.60",
+        ocr=ocr,
+    )
+
+    assert receipt.items == [Item(name="БЕНЗИН", sum=Decimal("999.60"))]
+    assert receipt.total == Decimal("999.60")
+    assert receipt.warnings == []
+
+
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+def test_summary_words_inside_product_names_remain_purchases(ocr: bool) -> None:
+    receipt = _parse(
+        HEADER + "КНИГА НАЛОГ НА ДОБАВЛЕННУЮ СТОИМОСТЬ 100.00\n"
+        "КНИГА НА ДОБАВЛЕННУЮ СТОИМОСТЬ 100.00\n"
+        "КНИГА НА ДОБАВЛЕННУЮ СТОИМОСТЬ 18% 100.00\n"
+        "НАЧИСЛЕНО БАЛЛОВ ШОКОЛАД 20.00\nИТОГО 320.00",
+        ocr=ocr,
+    )
+
+    assert [item.name for item in receipt.items] == [
+        "КНИГА НАЛОГ НА ДОБАВЛЕННУЮ СТОИМОСТЬ",
+        "КНИГА НА ДОБАВЛЕННУЮ СТОИМОСТЬ",
+        "КНИГА НА ДОБАВЛЕННУЮ СТОИМОСТЬ 18%",
+        "НАЧИСЛЕНО БАЛЛОВ ШОКОЛАД",
+    ]
+    assert receipt.warnings == []
+
+
+@pytest.mark.parametrize("extra", ["НЕРАСПОЗНАННЫЙ ТОВАР", "НДС 20% 100.00"])
+def test_unknown_attributes_do_not_relax_other_reconciliation_safeguards(extra: str) -> None:
+    receipt = _parse(HEADER + f"БЕНЗИН 65.00 x 10.00 = 650.00\n{extra}\nИТОГО 700.00", ocr=True)
+
+    assert receipt.items == [Item(name="БЕНЗИН", sum=Decimal("650.00"))]
+    assert receipt.total == Decimal("700.00")
+    assert receipt.warnings == ["items_incomplete"]
+
+
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
 def test_percentage_in_product_name_does_not_disable_total_validation(ocr: bool) -> None:
     receipt = _parse(HEADER + "СЫР 45% 200Г 300.00\nИТОГО 250.00", ocr=ocr)
 
