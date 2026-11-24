@@ -1,5 +1,6 @@
 import re
 from datetime import datetime, tzinfo
+from decimal import Decimal
 
 from common.contracts import Receipt, ReceiptWarning
 from common.ocr import OcrResult
@@ -12,6 +13,7 @@ from extract._text import (
 )
 from extract.item_region import (
     _can_reconcile_item_region,
+    _find_layout_totals,
     _has_unresolved_item_candidates,
     _is_metadata_line,
     _select_item_candidate_indices,
@@ -72,26 +74,34 @@ def parse_ocr_result(result: OcrResult, *, timezone: tzinfo) -> Receipt:
         ValueError: If a bounding-box coordinate is not finite.
     """
     layout = reconstruct_layout(result)
+    totals = _find_layout_totals(layout)
     text = "\n".join(line.text for line in layout)
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    receipt = _parse_receipt_fields(text, lines, timezone)
+    receipt = _parse_receipt_fields(
+        text, lines, timezone, total=totals[-1].amount if totals else None
+    )
     receipt.items, extraction_complete, items_incomplete = _extract_layout_items(
-        layout, store=receipt.store
+        layout, store=receipt.store, totals=totals
     )
     if items_incomplete:
         receipt.warnings.append(ITEMS_INCOMPLETE)
     _validate_arithmetic(
         receipt,
         extraction_complete=extraction_complete
-        and _can_reconcile_item_region(lines, store=receipt.store),
+        and _can_reconcile_item_region(
+            [line.text for line in layout], store=receipt.store, totals=totals
+        ),
     )
     return receipt
 
 
-def _parse_receipt_fields(text: str, lines: list[str], timezone: tzinfo) -> Receipt:
+def _parse_receipt_fields(
+    text: str, lines: list[str], timezone: tzinfo, *, total: Decimal | None = None
+) -> Receipt:
     store = _extract_store(lines)
     receipt_datetime = _extract_datetime(text, timezone)
-    total = _extract_total(lines)
+    if total is None:
+        total = _extract_total(lines)
     if total is None:
         total = _extract_bank_sum(lines)
 

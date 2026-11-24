@@ -1,13 +1,18 @@
 import re
+from dataclasses import dataclass
+from decimal import Decimal
 
 from extract._text import (
     _AMOUNT_PATTERN,
     _DATETIME_PATTERN,
+    _TOTAL_LABEL_PATTERN,
     SERVICE_LINE_PREFIXES,
     _extract_total,
     _has_service_prefix,
     _is_total_line,
+    _parse_decimal,
 )
+from extract.layout import LayoutLine, _has_usable_geometry, _nearby
 
 _NUMBERED_SERVICE_PREFIXES = ("касса", "смена", "чек")
 _HEADER_PREFIXES = (
@@ -33,10 +38,51 @@ _ADJUSTMENT_PREFIXES = (
 _DATE_OR_TIME_PATTERN = re.compile(r"(?:\d{2}\.\d{2}\.\d{4}|\d{2}:\d{2}(?::\d{2})?)")
 _PARTIAL_DATETIME_PATTERN = re.compile(r"\d{2}\.\d{2}(?:\.\d{2})?[ \t]+\d{2}:\d{2}(?::\d{2})?")
 _SUMMARY_PATTERN = re.compile(
-    rf"(?:{'|'.join(_ADJUSTMENT_PREFIXES)}|ндс|сумма ндс|без ндс|сумма\s*\(?\s*руб\.?\s*\)?)"
-    r"(?:\s*[:=]?\s*[\d\s.,:%=+\-−]+(?:\s*руб\.?)?)?",
+    rf"(?:{'|'.join(_ADJUSTMENT_PREFIXES)}|ндс|сумма ндс|без ндс|сумма\s*\(?\s*руб\.?\s*\)?"
+    r"|(?:(?:налог|[^\W\d_])\s+)?на\s+добавленную\s+стои[а-я]ость\s+\d+(?:[.,]\d+)?\s*%"
+    r"|(?:начислено|потрачено|всего)\s+баллов)"
+    r"(?:\s*[:=]?\s*[\d\s.,:/%=+\-−]+(?:\s*руб\.?)?)?",
     re.IGNORECASE,
 )
+
+
+@dataclass(frozen=True)
+class _TotalBoundary:
+    """An explicit total and the original layout rows identifying its boundary."""
+
+    label_index: int
+    amount_index: int
+    amount: Decimal
+
+
+def _find_layout_totals(lines: list[LayoutLine]) -> tuple[_TotalBoundary, ...]:
+    totals = []
+    for index, line in enumerate(lines):
+        amount = _extract_total([text.strip() for text in line.text.splitlines() if text.strip()])
+        if amount is not None:
+            totals.append(_TotalBoundary(index, index, amount))
+            continue
+        label = line.text.strip().rstrip(":=").strip()
+        if _TOTAL_LABEL_PATTERN.fullmatch(label) is None or index + 1 >= len(lines):
+            continue
+        if not _has_usable_geometry(line):
+            continue
+        candidates = []
+        for following_index in range(index + 1, len(lines)):
+            following = lines[following_index]
+            if following.y_min - line.y_max > line.y_max - line.y_min:
+                break
+            value = following.text.strip().removeprefix("=").strip()
+            if (
+                _AMOUNT_PATTERN.fullmatch(value)
+                and _has_usable_geometry(following)
+                and _nearby(line, following)
+                and following.x_min >= line.x_min
+            ):
+                candidates.append(_TotalBoundary(index, following_index, _parse_decimal(value)))
+        if len(candidates) == 1 and candidates[0].amount_index == index + 1:
+            totals.extend(candidates)
+    return tuple(totals)
 
 
 def _select_item_candidate_lines(lines: list[str], *, store: str | None) -> list[str]:
@@ -57,18 +103,26 @@ def _select_item_candidate_lines(lines: list[str], *, store: str | None) -> list
     return [lines[index].strip() for index in _select_item_candidate_indices(lines, store=store)]
 
 
-def _select_item_candidate_indices(lines: list[str], *, store: str | None) -> list[int]:
+def _select_item_candidate_indices(
+    lines: list[str], *, store: str | None, totals: tuple[_TotalBoundary, ...] = ()
+) -> list[int]:
     cleaned_lines = [(index, line.strip()) for index, line in enumerate(lines) if line.strip()]
     region_end = len(cleaned_lines)
-    for index in range(len(cleaned_lines) - 1, -1, -1):
-        _, line = cleaned_lines[index]
-        if _is_total_line(line) and _extract_total([line]) is not None:
-            region_end = index
-            break
+    if totals:
+        region_end = sum(index < totals[-1].label_index for index, _ in cleaned_lines)
+    else:
+        for index in range(len(cleaned_lines) - 1, -1, -1):
+            _, line = cleaned_lines[index]
+            if _is_total_line(line) and _extract_total([line]) is not None:
+                region_end = index
+                break
 
     candidates: list[int] = []
     merchant_removed = False
+    amount_rows = {total.amount_index for total in totals}
     for index, line in cleaned_lines[:region_end]:
+        if index in amount_rows:
+            continue
         folded_line = line.casefold()
         if store is not None and not merchant_removed and folded_line == store.strip().casefold():
             merchant_removed = True
@@ -97,12 +151,15 @@ def _has_unresolved_item_candidates(
     return False
 
 
-def _can_reconcile_item_region(lines: list[str], *, store: str | None) -> bool:
+def _can_reconcile_item_region(
+    lines: list[str], *, store: str | None, totals: tuple[_TotalBoundary, ...] = ()
+) -> bool:
     """Require a clear total boundary without unrepresented monetary summaries.
 
     Args:
         lines: Receipt rows, including metadata and summaries excluded from candidates.
         store: Identified merchant; an amount in this header may indicate a lost item.
+        totals: Recognized total boundaries retaining original row indices.
 
     Returns:
         Whether structural cues permit reconciliation, subject to actual candidate coverage.
@@ -110,16 +167,22 @@ def _can_reconcile_item_region(lines: list[str], *, store: str | None) -> bool:
         conservatively disable the check, as do unclassified monetary rows after the total.
         This cannot detect rows omitted entirely by OCR.
     """
-    cleaned = [line.strip() for line in lines if line.strip()]
-    totals = [index for index, line in enumerate(cleaned) if _is_total_line(line)]
-    if len(totals) != 1:
+    cleaned = [line.strip() for line in lines if totals or line.strip()]
+    labels = [index for index, line in enumerate(cleaned) if _is_total_line(line)]
+    if len(labels) != 1:
         return False
-    total_index = totals[0]
-    if _extract_total([cleaned[total_index]]) is None:
+    total_index = labels[0]
+    if totals:
+        if totals[-1].label_index != total_index:
+            return False
+        total_end = totals[-1].amount_index
+    elif _extract_total([cleaned[total_index]]) is None:
         return False
+    else:
+        total_end = total_index
     if store is not None and _AMOUNT_PATTERN.search(store):
         return False
-    footer_candidates = _select_item_candidate_lines(cleaned[total_index + 1 :], store=None)
+    footer_candidates = _select_item_candidate_lines(cleaned[total_end + 1 :], store=None)
     if any(_AMOUNT_PATTERN.search(line) for line in footer_candidates):
         return False
     if any(

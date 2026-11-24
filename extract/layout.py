@@ -117,3 +117,21 @@ def _make_line(row: list[_PositionedBlock]) -> LayoutLine:
         x_max=max(block.x_max for block in row),
         y_max=max(block.y_max for block in row),
     )
+
+
+def _has_usable_geometry(line: LayoutLine) -> bool:
+    previous_right = float("-inf")
+    for block in line.blocks:
+        left = min(x for x, _ in block.bbox)
+        right = max(x for x, _ in block.bbox)
+        top = min(y for _, y in block.bbox)
+        bottom = max(y for _, y in block.bbox)
+        if right <= left or bottom <= top or left < previous_right:
+            return False
+        previous_right = right
+    return bool(line.blocks)
+
+
+def _nearby(first: LayoutLine, second: LayoutLine) -> bool:
+    height = min(first.y_max - first.y_min, second.y_max - second.y_min)
+    return 0 <= second.y_min - first.y_max <= height

@@ -29,7 +29,10 @@ def _parse_simple_item_line(line: str) -> Item | None:
 
 
 def _is_item_name(name: str) -> bool:
-    if not any(character.isalpha() for character in name) or name.endswith(("-", "+", "−")):
+    if not any(character.isalpha() for character in name) or name.endswith(("+", "−")):
+        return False
+    # A clipped word can end in a hyphen; a separate trailing sign is an operand marker.
+    if name.endswith("-") and (len(name) < 2 or not name[-2].isalpha()):
         return False
     if _MULTIPLICATION_PATTERN.search(name):
         return False
