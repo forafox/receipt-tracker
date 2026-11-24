@@ -8,7 +8,7 @@ from ocr.core.errors import (
     OcrError,
 )
 from ocr.core.ordering import blocks_to_text
-from ocr.engines.factory import build_ocr_engine
+from ocr.engines.factory import build_ocr_engine, build_ocr_engines
 from ocr.service import OcrService, build_default_ocr_service
 
 __all__ = [
@@ -25,4 +25,5 @@ __all__ = [
     "blocks_to_text",
     "build_default_ocr_service",
     "build_ocr_engine",
+    "build_ocr_engines",
 ]

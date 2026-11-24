@@ -131,6 +131,29 @@ async def test_pipeline_extracts_items_from_layout() -> None:
     assert receipt.warnings == []
 
 
+async def test_adaptive_pipeline_selects_best_parsed_candidate() -> None:
+    mismatch = FakeRecognizer("ПЯТЁРОЧКА\n05.10.2026 18:20\nМОЛОКО 100.00\nИТОГО 999.00")
+    no_date = FakeRecognizer("ПЯТЁРОЧКА\nМОЛОКО 100.00\nИТОГО 100.00")
+    best = FakeRecognizer("ПЯТЁРОЧКА\n05.10.2026 18:20\nМОЛОКО 100.00\nИТОГО 100.00")
+    storage = FakeStorage()
+    pipeline = ReceiptPipeline(
+        best,
+        storage,
+        MOSCOW_TIMEZONE,
+        recognizers=[mismatch, no_date, best],
+    )
+
+    receipt = await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert receipt.datetime == datetime(2026, 10, 5, 18, 20, tzinfo=MOSCOW_TIMEZONE)
+    assert receipt.total == Decimal("100.00")
+    assert receipt.items == [Item(name="МОЛОКО", sum=Decimal("100.00"))]
+    assert mismatch.received == b"image"
+    assert no_date.received == b"image"
+    assert best.received == b"image"
+    assert storage.saved == [(1, receipt, datetime(2026, 10, 5, 18, 20, tzinfo=MOSCOW_TIMEZONE))]
+
+
 async def test_receipt_without_date_is_saved_at_receive_time() -> None:
     storage = FakeStorage()
 
@@ -198,6 +221,24 @@ async def test_engine_failure_is_reported_as_temporary() -> None:
         await pipeline.process_photo(1, b"image", RECEIVED_AT)
 
     assert raised.value.__cause__ is error
+    assert storage.saved == []
+
+
+async def test_adaptive_pipeline_reports_last_engine_failure() -> None:
+    first = OcrEngineUnavailableError("psm 3 failed")
+    last = OcrEngineUnavailableError("psm 6 failed")
+    storage = FakeStorage()
+    pipeline = ReceiptPipeline(
+        FailingRecognizer(first),
+        storage,
+        MOSCOW_TIMEZONE,
+        recognizers=[FailingRecognizer(first), FailingRecognizer(last)],
+    )
+
+    with pytest.raises(RecognitionUnavailable) as raised:
+        await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert raised.value.__cause__ is last
     assert storage.saved == []
 
 
