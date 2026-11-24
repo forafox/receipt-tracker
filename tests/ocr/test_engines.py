@@ -12,6 +12,7 @@ from ocr.core.ordering import blocks_to_text
 from ocr.core.postprocess import PostprocessSettings
 from ocr.core.quality import QualityThresholds
 from ocr.engines.easyocr import EasyOcrEngine
+from ocr.engines.hunyuan_vision import HunyuanVisionEngine
 from ocr.engines.factory import build_ocr_engine, build_ocr_engines
 from ocr.engines.tesseract import TesseractEngine
 
@@ -47,6 +48,19 @@ def test_fake_engine_satisfies_ocr_engine_interface() -> None:
 def test_build_ocr_engine_rejects_unknown_name() -> None:
     with pytest.raises(ValueError, match="Unknown OCR engine"):
         build_ocr_engine(OcrSettings(engine="missing"))
+
+
+def test_factory_prioritizes_hunyuan_as_an_optional_candidate() -> None:
+    engines = build_ocr_engines(
+        OcrSettings(
+            engine="tesseract",
+            adaptive=False,
+            hunyuan_ocr_enabled=True,
+            hunyuan_ocr_model="HunyuanOCR",
+        )
+    )
+
+    assert [engine.name for engine in engines] == ["hunyuan_ocr", "tesseract"]
 
 
 def test_factory_wires_quality_gate_from_settings() -> None:
@@ -100,8 +114,9 @@ def test_adaptive_factory_builds_one_engine_per_psm() -> None:
 
     engines = build_ocr_engines(settings)
 
+    assert isinstance(engines[0], HunyuanVisionEngine)
     configs = []
-    for engine in engines:
+    for engine in engines[1:]:
         assert isinstance(engine, TesseractEngine)
         configs.append(engine._tesseract_config)
     assert configs == ["--oem 1 --psm 3", "--oem 1 --psm 4", "--oem 1 --psm 6"]
@@ -112,8 +127,9 @@ def test_adaptive_factory_is_a_single_pass_when_disabled() -> None:
         OcrSettings(engine="tesseract", adaptive=False, tesseract_config="--psm 6")
     )
 
-    assert len(engines) == 1
-    engine = engines[0]
+    assert len(engines) == 2
+    assert isinstance(engines[0], HunyuanVisionEngine)
+    engine = engines[1]
     assert isinstance(engine, TesseractEngine)
     assert engine._tesseract_config == "--psm 6"
 
@@ -121,8 +137,9 @@ def test_adaptive_factory_is_a_single_pass_when_disabled() -> None:
 def test_adaptive_factory_does_not_duplicate_easyocr_engines() -> None:
     engines = build_ocr_engines(OcrSettings(engine="easyocr", adaptive=True))
 
-    assert len(engines) == 1
-    assert isinstance(engines[0], EasyOcrEngine)
+    assert len(engines) == 2
+    assert isinstance(engines[0], HunyuanVisionEngine)
+    assert isinstance(engines[1], EasyOcrEngine)
 
 
 def test_importing_ocr_does_not_import_engine_dependencies() -> None:

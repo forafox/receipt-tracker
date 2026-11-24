@@ -10,7 +10,8 @@ from itertools import count
 
 from common.contracts import Receipt, ReceiptWarning
 from common.ocr import OcrEngine, OcrResult
-from extract import parse_ocr_result
+from categorize.service import CategoryService
+from extract.agent import parse_with_agent
 from ocr import ImageDecodeError, ImageTooLargeError, OcrError
 from storage import ReceiptStorage
 
@@ -61,6 +62,7 @@ class MonthlySummary:
     month: date
     receipt_count: int
     total: Decimal
+    category_totals: dict[str, Decimal] | None = None
 
 
 def _score_receipt(receipt: Receipt, block_count: int) -> int:
@@ -96,8 +98,8 @@ class ReceiptPipeline:
 
     A receipt rejected as a duplicate is kept in memory until the user decides whether to
     save it anyway. Only the latest such receipt per user is kept, and it is lost on restart.
-    When several recognizers are supplied, each result is parsed and the highest-scoring
-    receipt is saved.
+    A parseable Hunyuan result is absolute priority. Other recognizers run only when
+    Hunyuan fails; without Hunyuan, the highest-scoring parsed OCR result is saved.
     """
 
     def __init__(
@@ -107,6 +109,7 @@ class ReceiptPipeline:
         timezone: tzinfo,
         *,
         recognizers: Sequence[OcrEngine] | None = None,
+        category_service: CategoryService | None = None,
     ) -> None:
         """Create a pipeline.
 
@@ -125,6 +128,7 @@ class ReceiptPipeline:
             msg = "at least one recognizer is required"
             raise ValueError(msg)
         self._storage = storage
+        self._category_service = category_service
         self._timezone = timezone
         self._pending_duplicates: dict[int, tuple[int, Receipt, datetime]] = {}
         self._pending_ids = count(1)
@@ -164,6 +168,21 @@ class ReceiptPipeline:
                 len(blocks.blocks),
             )
             raise ReceiptUnreadable
+        if self._category_service is not None and receipt.items:
+            try:
+                classified = self._category_service.classify_receipt(receipt)
+                receipt = receipt.model_copy(
+                    update={
+                        "items": [
+                            item.model_copy(
+                                update={"categories": [s.category for s in item.categories]}
+                            )
+                            for item in classified.items
+                        ]
+                    }
+                )
+            except Exception:
+                logger.exception("M3 category classification failed; saving receipt without categories")
         purchased_at = receipt.datetime or received_at
         save_started = time.perf_counter()
         saved = await asyncio.to_thread(self._storage.save, user_id, receipt, purchased_at)
@@ -186,43 +205,51 @@ class ReceiptPipeline:
         return receipt
 
     async def _read_receipt(self, photo: bytes) -> tuple[OcrResult, Receipt, float, float]:
-        ocr_started = time.perf_counter()
-        results: list[OcrResult] = []
+        ocr_seconds = 0.0
+        parse_seconds = 0.0
         errors: list[Exception] = []
+        candidates: list[tuple[OcrEngine, OcrResult, Receipt]] = []
         for recognizer in self._recognizers:
+            ocr_started = time.perf_counter()
             try:
-                results.append(await asyncio.to_thread(recognizer.recognize_blocks, photo))
+                result = await asyncio.to_thread(recognizer.recognize_blocks, photo)
             except (ImageTooLargeError, ImageDecodeError):
                 raise
             except OcrError as error:
                 errors.append(error)
-        ocr_finished = time.perf_counter()
-        if not results:
-            if errors:
-                raise errors[-1]
-            msg = "no OCR candidates were produced"
-            raise RecognitionUnavailable(msg)
+                continue
+            ocr_seconds += time.perf_counter() - ocr_started
 
-        candidates: list[tuple[OcrResult, Receipt]] = []
-        for result in results:
+            parse_started = time.perf_counter()
             try:
-                receipt = parse_ocr_result(result, timezone=self._timezone)
+                receipt = await asyncio.to_thread(
+                    parse_with_agent, result, timezone=self._timezone
+                )
             except ValueError as error:
                 errors.append(error)
                 continue
-            candidates.append((result, receipt))
-        parse_finished = time.perf_counter()
+            parse_seconds += time.perf_counter() - parse_started
+            candidates.append((recognizer, result, receipt))
+            # Hunyuan is the primary recognizer. Once its text can be parsed, keep
+            # its result without waiting for or comparing lower-priority OCR engines.
+            if recognizer.name == "hunyuan_ocr":
+                break
+
         if not candidates:
             if errors:
                 raise errors[-1]
             msg = "no OCR candidate could be parsed"
             raise RecognitionUnavailable(msg)
 
-        best = max(
-            candidates,
-            key=lambda candidate: _score_receipt(candidate[1], len(candidate[0].blocks)),
+        hunyuan = next(
+            (candidate for candidate in candidates if candidate[0].name == "hunyuan_ocr"),
+            None,
         )
-        return best[0], best[1], ocr_finished - ocr_started, parse_finished - ocr_finished
+        best = hunyuan or max(
+            candidates,
+            key=lambda candidate: _score_receipt(candidate[2], len(candidate[1].blocks)),
+        )
+        return best[1], best[2], ocr_seconds, parse_seconds
 
     async def save_duplicate(self, user_id: int, pending_id: int) -> Receipt | None:
         """Save a receipt rejected as a duplicate, after the user confirmed it.
@@ -278,7 +305,20 @@ class ReceiptPipeline:
         total = sum(
             (receipt.total for receipt in receipts if receipt.total is not None), Decimal(0)
         )
-        return MonthlySummary(month=start.date(), receipt_count=len(receipts), total=total)
+        category_totals: dict[str, Decimal] = {}
+        for receipt in receipts:
+            for item in receipt.items:
+                if not item.categories:
+                    continue
+                share = item.sum / len(item.categories)
+                for category in item.categories:
+                    category_totals[category] = category_totals.get(category, Decimal(0)) + share
+        return MonthlySummary(
+            month=start.date(),
+            receipt_count=len(receipts),
+            total=total,
+            category_totals=category_totals or None,
+        )
 
     async def recent_receipts(self, user_id: int) -> list[Receipt]:
         """List a user's most recent receipts.

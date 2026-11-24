@@ -34,6 +34,7 @@ def test_item_quantity_and_price_are_optional() -> None:
 
     assert item.quantity is None
     assert item.price is None
+    assert item.categories == []
 
 
 def test_receipt_fields_are_optional() -> None:
@@ -96,6 +97,14 @@ def test_receipt_json_round_trip() -> None:
     restored = Receipt.model_validate_json(serialized)
 
     assert restored == receipt
+
+
+def test_item_categories_survive_receipt_json_round_trip() -> None:
+    receipt = Receipt(items=[Item(name="МОЛОКО", sum=Decimal("89.99"), categories=["food"])])
+
+    restored = Receipt.model_validate_json(receipt.model_dump_json())
+
+    assert restored.items[0].categories == ["food"]
 
 
 def test_receipt_warning_values_are_stable() -> None:

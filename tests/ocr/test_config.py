@@ -29,6 +29,9 @@ def test_adaptive_mode_is_disabled_with_safe_defaults() -> None:
 
     assert settings.adaptive is False
     assert settings.adaptive_psm_modes == [3, 4, 6]
+    assert settings.hunyuan_ocr_enabled is True
+    assert settings.hunyuan_ocr_model == "HunyuanOCR"
+    assert settings.hunyuan_ocr_timeout_seconds == 600.0
 
 
 def test_adaptive_mode_is_loaded_from_environment(

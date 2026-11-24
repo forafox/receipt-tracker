@@ -20,108 +20,138 @@
 
 ## Структура
 
-| Файл / папка       | Назначение                                                                 |
-| ------------------ | -------------------------------------------------------------------------- |
-| `api.py`           | FastAPI-приложение, HTTP-контракт модуля, пути по умолчанию к данным/модели |
-| `service.py`       | `CategoryService`: оборачивает `Item`/`Receipt` в классифицированные версии |
-| `classifier.py`    | `CategoryClassifier` — Protocol интерфейса (`predict(item_name)`)           |
-| `transformer.py`   | инференс на обученном трансформере                                   |
-| `training.py`      | обучение (`train_transformer`), сплит, балансировка, метрики               |
-| `dataset.py`       | чтение CSV (`load_training_examples`)                                      |
-| `external_dataset.py` | сборка обучающего CSV из Hugging Face + seed                             |
-| `schemas.py`       | `TrainingExample(text, category)`                                          |
-| `eval.py`          | `evaluate`: exact-match accuracy по множествам категорий                   |
-| `__main__.py`      | CLI: `train`, `build-dataset`, `eval`                                      |
-| `data/`            | обучающие CSV: `items.csv` (seed, 104 строки), `training.csv` (110 строк)  |
-| `models/`          | обученные веса `category_transformer` + `category_metadata.json`           |
+| Файл / папка             | Назначение                                                                 |
+| ------------------------ | -------------------------------------------------------------------------- |
+| `api.py`                 | FastAPI-приложение, HTTP-контракт модуля, пути по умолчанию к данным/модели |
+| `service.py`             | `CategoryService`: оборачивает `Item`/`Receipt` в классифицированные версии |
+| `classifier.py`          | `CategoryClassifier` — Protocol интерфейса (`predict(item_name)`)           |
+| `transformer.py`         | инференс: `denoise`, токенизация, sigmoid, per-label пороги                 |
+| `training.py`            | обучение, group-aware split, best checkpoint по eval loss, подбор порогов, метрики        |
+| `dataset.py`             | чтение CSV (`load_training_examples`)                                      |
+| `schemas.py`             | `TrainingExample(text, category, source, group_id)`                         |
+| `text.py`                | `denoise`, `add_noise` (профили `ocr`/`layout`/`receipt`/`words`/`severe`), `shorten` |
+| `bpe.py`                 | BPE-токенизатор для аугментации и BPE-dropout                              |
+| `augment.py`             | синтетические пары/тройки, шумовые варианты, BPE-dropout, `group_id`        |
+| `prepare_dataset.py`     | сборка `training_final.csv` из всех источников и аугментаций                |
+| `external_multilabel.py` | извлечение мультилейбл-строк из Open Food Facts/Beauty                      |
+| `external_dataset.py`    | legacy-сборка из Hugging Face + seed                                       |
+| `baseline.py`            | TF-IDF + LogisticRegression на том же split                                |
+| `error_analysis.py`      | ошибки через `TransformerCategoryClassifier`                               |
+| `report.py`              | метрики, CSV и графики для `reports/m3/`                                   |
+| `eval.py`                | `evaluate`: exact-match accuracy и micro-F1                                |
+| `__main__.py`            | CLI: `train`, `build-dataset`, `eval`                                      |
+| `data/`                  | обучающие CSV и контрпримеры                                               |
+| `models/`                | веса `category_transformer` + `category_metadata.json`                     |
 
 Контракты обмена (`Item`, `Receipt`, `CategoryScore`, `ClassifiedItem`, …) живут
 в общем пакете `common` и здесь не дублируются.
 
 ## Как работает предсказание
 
-1. Токенизация названия (`max_length=64`), `sigmoid` по логитам каждой категории.
-2. Порог `0.5`; если ни одна категория не прошла — берётся argmax.
-3. Результат сортируется по уверенности, других эвристик нет — только модель.
-4. Пустая строка — `ValueError`.
+1. `denoise()`: NFKC, VAT-префиксы, гомоглифы, хвостовые количества.
+2. Токенизация (`max_length=64`), `sigmoid` по логитам каждой категории.
+3. Порог берётся из `category_metadata.json` для каждого класса; fallback `0.5`.
+4. Если ни одна категория не прошла порог — берётся argmax.
+5. Результат сортируется по уверенности; пустая строка — `ValueError`.
 
 ## Данные
 
 Формат `data/*.csv`: `text,category` в UTF-8 с заголовком. Пустые строки пропускаются.
+`category` — одна или несколько меток через `|`.
 
 ```csv
 text,category
 молоко 3.2%,food
-капучино,cafe
+капучино,cafe|food
 ```
 
-Основной датасет — `data/training_wb.csv` (24 219 строк): реальные русские
-названия товаров из Wildberries (`nyuuzyou/wb-products`, CC0) и русский срез
-Open Food Facts (4 430 строк). Разметка по `subj_root_name` / категориям OFF:
+- `data/training_wb.csv` — 24 219 реальных русских названий: Wildberries
+  (`nyuuzyou/wb-products`, CC0) и русский срез Open Food Facts. Одна метка на строку.
+- `data/multilabel_curated.csv` — 39 вручную размеченных неоднозначных чековых форм.
+- `data/multilabel_external.csv` — 785 строк из Open Food Facts/Beauty, где теги
+  товара пересекают группы M3 (`food|medicine`, `food|household`,
+  `household|personal_care`, `cafe|food`).
+- `data/hard_negatives.csv` — 77 контрпримеров из разбора ошибок.
+- `data/training_final.csv` — 45 768 строк, 9 982 мультилейбл. Генерируется
+  `prepare_dataset`; в git не входит.
+- `data/training.csv` — 110 строк для smoke-тестов.
+- `data/holdout_manual.csv` — 41 короткая чековая форма для ручной проверки.
 
-| Категория | Строк |
-| --------- | ----- |
-| `food` | 6 000 |
-| `household` | 6 000 |
-| `personal_care` | 6 000 |
-| `medicine` | 6 000 |
-| `cafe` | 219 |
+Аугментации в `prepare_dataset`:
 
-К каждому названию добавляются короткие «чековые» формы: префиксы из 5/3/2 слов
-и первое слово названия (`Молоко 3,2% пастеризованное` → `молоко`). Первое слово
-берётся только у 300 самых частых и не используется, если встречается в нескольких
-классах (`молоко` для еды и молочка для тела). Квоты по длине (300/800/1000/остальные)
-одинаковы для всех классов, иначе модель выучивает «короткая строка = cafe».
-
-`cafe` (готовые блюда и напитки) — единственная категория без публичного русского
-датасета, список собран вручную. `build-dataset` (seed + `IvanTatarkin/ru-product-taxonomy`)
-оставлен для совместимости; этот HF-датасет на 99 % состоит из нерусских
-(французских) названий, поэтому для обучения не используется.
+- пары и тройки из реальных названий разных групп (`pairs_per_pair=500`,
+  `triples=1000`);
+- OCR-шум для 25 % строк (`noise_fraction=0.25`), по 2 варианта на строку
+  (`noise_variants=2`);
+- профили шума `ocr`, `layout`, `receipt`, `words`, `severe`: смешения
+  символов, потеря границ слов, обрезка, НДС/количество/разделители;
+- BPE-dropout для 35 % шумовых вариантов (`bpe.py`, vocab 2 000);
+- `group_id` у всех строк, чтобы чистые, короткие, синтетические и шумовые
+  варианты одного товара не попадали одновременно в train и test.
 
 ## Обучение
 
 База — `cointegrated/rubert-tiny`, `problem_type="multi_label_classification"`:
 
-- `epochs=15` (на GPU), `lr=5e-5`, `batch=8`, `weight_decay=0.01`, `seed=42`;
-- стратифицированный сплит 80/20 (минимум 1 пример класса в валидации);
-- oversampling train-фолда до мажоритарного класса, но не больше 4 проходов по
-  примерам своего класса (`MAX_OVERSAMPLE_REPEAT`) — иначе маленький `cafe`
-  раздувается до 20 % трейна и модель начинает предсказывать его по длине строки;
-- метрики валидации: `exact_match` + `micro_f1`.
+- `epochs=15` (CLI по умолчанию 6, для полного датасета нужно `--epochs 15`),
+  `lr=5e-5`, `batch=8`, `weight_decay=0.01`, `seed=42`;
+- group-aware split: 72 % train, 8 % validation, 20 % test;
+- oversampling train-фолда до мажоритарного класса, но не больше 4 проходов;
+- best checkpoint по `eval_loss`, `save_total_limit=1`;
+- после обучения пороги подбираются на validation по F1 каждого класса и
+  сохраняются в metadata/manifest.
 
-Метрики на сбалансированном holdout (`data/training_wb.csv`, 4 844 строки):
+Метрики m3e на старом test (7 784 строки, 1 718 мультилейбл). Текущая
+`training_final.csv` содержит 45 768 строк после добавления BPE/шума; эксперимент
+m3f описан в `reports/m3f/REPORT.md`.
 
-| Категория | exact_match | micro_f1 | n |
-| --------- | ----------- | -------- | - |
-| `food` | 0.8758 | 0.8772 | 1200 |
-| `household` | 0.9150 | 0.9159 | 1200 |
-| `personal_care` | 0.8758 | 0.8777 | 1200 |
-| `medicine` | 0.8983 | 0.8980 | 1200 |
-| `cafe` | 0.7273 | 0.7273 | 44 |
-| **итого** | **0.8898** | **0.8907** | **4844** |
+| Метрика | Значение |
+|---|---:|
+| Exact match | 0.7821 |
+| Micro F1 | 0.8661 |
+| Macro F1 | 0.8649 |
+| Hamming loss | 0.0671 |
+| Mean label recall | 0.8789 |
+| Multilabel exact match | 0.5722 |
 
-Сбалансированная точность по классам — 0.8585. Отдельная проверка на 100 коротких
-«чековых» словах (`молоко`, `сыр`, `шампунь`, `аспирин`, `капучино`, …): 0.84,
-из них исходные 10 слов из постановки — 10/10.
+| Класс | Precision | Recall | F1 | Support |
+|---|---:|---:|---:|---:|
+| cafe | 0.836 | 0.878 | 0.857 | 773 |
+| food | 0.860 | 0.876 | 0.868 | 2 349 |
+| household | 0.881 | 0.901 | 0.891 | 2 184 |
+| medicine | 0.861 | 0.826 | 0.843 | 2 245 |
+| personal_care | 0.873 | 0.859 | 0.866 | 2 201 |
 
+Baseline TF-IDF + LogisticRegression на том же split: exact 0.7157, micro 0.8375,
+macro 0.8347, hamming 0.0811. Transformer лучше по всем агрегатам.
+
+Ручной набор из 41 короткой формы: exact 0.854, micro 0.907.
+
+## CLI
 
 ```bash
 # из корня репозитория:
-uv run python -m categorize build-dataset --limit 300
-uv run python -m categorize train \
-  --dataset categorize/data/training_wb.csv \
+python -m categorize.prepare_dataset
+python -m categorize train \
+  --dataset categorize/data/training_final.csv \
   --model categorize/models/category_transformer --epochs 15
-uv run python -m categorize eval \
-  --dataset categorize/data/training_wb.csv \
+python -m categorize eval \
+  --dataset categorize/data/holdout_manual.csv \
   --model categorize/models/category_transformer
+python -m categorize.report \
+  --model categorize/models/category_transformer \
+  --dataset categorize/data/training_final.csv \
+  --log reports/m3/raw/train.log \
+  --output reports/m3
 ```
 
-Если файла модели нет, `eval` и `load_service` обучат её автоматически.
+Если файла модели нет, `eval` и `load_service` обучат её автоматически на
+`DEFAULT_DATASET_PATH` (`data/training.csv`, smoke-набор).
 
 ## FastAPI
 
 ```bash
-uv run fastapi dev categorize/api.py
+python -m fastapi dev categorize/api.py
 ```
 
 | Метод | Путь | Тело | Ответ |
@@ -137,8 +167,10 @@ uv run fastapi dev categorize/api.py
 ## Проверки
 
 ```bash
-uv run ruff check categorize
-uv run ruff format --check categorize
-uv run mypy categorize
-uv run pytest tests/categorize -q
+ruff check categorize
+ruff format --check categorize
+mypy categorize
+pytest tests/categorize -q
 ```
+
+Подробные метрики, графики и разбор ошибок — `reports/m3/REPORT.md`.

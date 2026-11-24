@@ -1,14 +1,18 @@
 import asyncio
 import logging
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.types import BotCommand
 
 from bot.config import BotSettings
 from bot.handlers import router
 from bot.middleware import LanguageMiddleware
 from bot.texts import DEFAULT_TEXTS, TEXTS_BY_LANGUAGE, Texts
+from categorize.service import CategoryService
+from categorize.transformer import TransformerCategoryClassifier
 from ocr import OcrSettings, build_ocr_engines
 from pipeline import ReceiptPipeline
 from storage import SqliteReceiptStorage
@@ -45,14 +49,23 @@ async def set_commands(bot: Bot) -> None:
 async def main() -> None:
     """Configure and start the Telegram bot polling loop."""
     settings = BotSettings()
-    bot = Bot(token=settings.token.get_secret_value())
+    session = AiohttpSession(proxy=settings.api_proxy)
+    bot = Bot(token=settings.token.get_secret_value(), session=session)
     storage = SqliteReceiptStorage(settings.database_path)
+    category_service = None
+    model_path = Path("categorize/models/category_transformer")
+    try:
+        category_service = CategoryService(TransformerCategoryClassifier.load(model_path))
+        logging.info("Loaded M3 category transformer from %s", model_path)
+    except (OSError, ValueError, ImportError) as error:
+        logging.warning("M3 category model unavailable at %s: %s", model_path, error)
     recognizers = build_ocr_engines(OcrSettings())
     pipeline = ReceiptPipeline(
         recognizers[0],
         storage,
         ZoneInfo(settings.timezone),
         recognizers=recognizers,
+        category_service=category_service,
     )
     dispatcher = Dispatcher(service=pipeline)
     dispatcher.message.middleware(LanguageMiddleware())

@@ -6,6 +6,7 @@ from common.contracts import Receipt, ReceiptWarning
 from common.ocr import OcrResult
 from extract._text import (
     _AMOUNT_PATTERN,
+    _COMPACT_DATETIME_PATTERN,
     _DATETIME_PATTERN,
     _extract_bank_sum,
     _extract_total,
@@ -29,6 +30,7 @@ TOTAL_NOT_FOUND = ReceiptWarning.TOTAL_NOT_FOUND
 ITEMS_INCOMPLETE = ReceiptWarning.ITEMS_INCOMPLETE
 
 _NUMBER_ONLY_PATTERN = re.compile(r"[\d\s.,:+\-№#]+")
+_LEGAL_STORE_PREFIX_PATTERN = re.compile(r"^(?:о[оcс]о|и[пn]|ао|пао|зао|оао)\b", re.IGNORECASE)
 
 
 def parse_receipt(text: str, *, timezone: tzinfo) -> Receipt:
@@ -78,8 +80,15 @@ def parse_ocr_result(result: OcrResult, *, timezone: tzinfo) -> Receipt:
     text = "\n".join(line.text for line in layout)
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     receipt = _parse_receipt_fields(
-        text, lines, timezone, total=totals[-1].amount if totals else None
+        text,
+        lines,
+        timezone,
+        total=totals[-1].amount if totals else _extract_total(lines),
     )
+    if receipt.store is None:
+        receipt.store = _extract_ocr_store(lines)
+        if receipt.store is not None and STORE_NOT_FOUND in receipt.warnings:
+            receipt.warnings.remove(STORE_NOT_FOUND)
     receipt.items, extraction_complete, items_incomplete = _extract_layout_items(
         layout, store=receipt.store, totals=totals
     )
@@ -132,6 +141,24 @@ def _extract_store(lines: list[str]) -> str | None:
     return candidates[0] if len(candidates) == 1 else None
 
 
+def _extract_ocr_store(lines: list[str]) -> str | None:
+    for line in lines:
+        cleaned = line.strip().strip("#|").strip()
+        if _LEGAL_STORE_PREFIX_PATTERN.match(cleaned) and _is_plausible_store_line(cleaned):
+            return cleaned
+    for line in lines:
+        if line.casefold().startswith(("место расчетов", "место расчётов")):
+            value = re.sub(r"^место расч[её]тов\s*[:|]*\s*", "", line, flags=re.IGNORECASE).strip(
+                " |"
+            )
+            if value and _is_plausible_store_line(value) and not _is_metadata_line(value):
+                return value
+    return None
+
+
+_LEGAL_STORE_PREFIX_PATTERN = re.compile(r"^(?:о[оcс]о|и[пn]|ао|пао|зао|оао)\b", re.IGNORECASE)
+
+
 def _is_plausible_store_line(line: str) -> bool:
     if _is_metadata_line(line):
         return False
@@ -142,6 +169,22 @@ def _is_plausible_store_line(line: str) -> bool:
 
 
 def _extract_datetime(text: str, timezone: tzinfo) -> datetime | None:
+    for compact in _COMPACT_DATETIME_PATTERN.finditer(text):
+        day, month, year, hour, minute, second = compact.groups()
+        try:
+            parsed = datetime(
+                int(year) + (2000 if len(year) == 2 else 0),
+                int(month),
+                int(day),
+                int(hour),
+                int(minute),
+                int(second or 0),
+                tzinfo=timezone,
+            )
+        except ValueError:
+            pass
+        else:
+            return parsed
     for match in _DATETIME_PATTERN.finditer(text):
         value = " ".join(match.group(1).split())
         for date_format in (

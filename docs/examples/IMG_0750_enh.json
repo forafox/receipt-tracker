@@ -1,0 +1,51 @@
+{
+  "receipt": {
+    "store": "ТК ЛЕНТА-702",
+    "datetime": "2024-12-05T10:36:00+03:00",
+    "total": "464.00",
+    "items": [
+      {
+        "name": "Хлеб Теплый Дар Тостов",
+        "quantity": "1",
+        "price": "74.98",
+        "sum": "74.98"
+      },
+      {
+        "name": "Хлеб Хлебный Дом Герку",
+        "quantity": "2",
+        "price": "99.52",
+        "sum": "199.04"
+      },
+      {
+        "name": "Сыр PRESIDENT творожный",
+        "quantity": "2",
+        "price": "94.99",
+        "sum": "189.98"
+      }
+    ],
+    "warnings": []
+  },
+  "match": {
+    "store": true,
+    "date": true,
+    "total": true,
+    "item_sum_hits": 0,
+    "item_rows": 3
+  },
+  "target": {
+    "store": "ООО \"Лента\"",
+    "date": "05.12.24",
+    "total": "464.00",
+    "items": [
+      "Хлеб ТЕПЛЫЙ ДАР ТОСТОВ",
+      "Хлеб ХЛЕБНЫЙ ДОН ГЕРКУ",
+      "Сыр PRESIDENT ТВОРЖИЯ"
+    ],
+    "item_sums": [
+      "74.58",
+      "193.04",
+      "183.58"
+    ]
+  },
+  "ocr_seconds": 175.36
+}

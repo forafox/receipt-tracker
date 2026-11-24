@@ -241,17 +241,17 @@ class TestPDFContractBehavior:
 
     def test_category_score_schema(self) -> None:
         """PDF: CategoryScore(category, confidence) with category str, confidence float [0,1]."""
-        with open(CATEGORIZE_DIR / "schemas.py") as f:
+        with open(CATEGORIZE_DIR.parent / "common" / "models.py") as f:
             content = f.read()
 
-        # Must have CategoryScore class
+        # Canonical output schema lives in common.models (no duplicate in categorize).
         has_category_score = "class CategoryScore" in content
         # Must have category field
         has_category = "category: str" in content
         # Must have confidence field with ge=0, le=1
         has_confidence = "confidence: float" in content and "ge=0" in content and "le=1" in content
 
-        assert has_category_score, "schemas.py must have CategoryScore class"
+        assert has_category_score, "common/models.py must have CategoryScore class"
         assert has_category, "CategoryScore must have category field (str)"
         assert has_confidence, "CategoryScore must have confidence field (float, 0-1)"
 

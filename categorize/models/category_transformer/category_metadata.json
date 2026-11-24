@@ -6,5 +6,13 @@
     "3": "medicine",
     "4": "personal_care"
   },
-  "max_length": 64
+  "max_length": 64,
+  "thresholds": {
+    "cafe": 0.8,
+    "food": 0.68,
+    "household": 0.62,
+    "medicine": 0.76,
+    "personal_care": 0.68
+  },
+  "temperature": 1.0
 }

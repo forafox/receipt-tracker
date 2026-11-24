@@ -11,6 +11,7 @@ class BotSettings(BaseSettings):
         token: Secret Telegram bot token read from ``BOT_TOKEN``.
         timezone: Timezone of receipt times read from ``BOT_TIMEZONE``.
         database_path: SQLite database file read from ``BOT_DATABASE_PATH``.
+        api_proxy: Optional proxy URL read from ``BOT_API_PROXY``.
     """
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="BOT_", extra="ignore")
@@ -18,3 +19,4 @@ class BotSettings(BaseSettings):
     token: SecretStr
     timezone: str = "Europe/Moscow"
     database_path: Path = Path("receipts.sqlite")
+    api_proxy: str | None = None

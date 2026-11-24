@@ -69,6 +69,45 @@ uv run python -m bot
 
 Полная инструкция по локальному запуску (бот и M3 API): [docs/RUN.md](docs/RUN.md).
 
+## Local OCR receipt reviewer
+
+Install Ollama and pull the small Russian-capable CPU model:
+
+```bash
+ollama pull qwen2.5:1.5b-instruct-q4_K_M
+```
+
+Review a receipt OCR text file without sending it to a remote service or changing
+the saved receipt:
+
+```bash
+uv run python -m extract.review path/to/receipt-ocr.txt
+```
+
+Or pipe OCR text through stdin. The JSON result includes a deterministic verdict
+and summary, the model's separate verdict and issue suggestions, a proposed full text,
+numeric-token preservation, and deterministic
+parses of both original and proposed text. `safe_to_apply` is false if the model
+is uncertain/incorrect, changes numeric tokens, or the proposal fails the
+existing arithmetic checks. Treat every correction as a suggestion; the reviewer
+does not overwrite parsed or stored receipts. Set `OCR_REVIEW_MODEL` and
+`OLLAMA_HOST` in `.env` to select another local model or Ollama host.
+
+The same Ollama model is used by M2 as a fallback only when deterministic parsing
+reports warnings. Long OCR results are sent in overlapping chunks of up to 3,000
+characters. Returned fields must be supported by OCR evidence: dates must occur in
+the text, totals must occur on a total line, and item amounts must be adjacent to
+the product name outside payment/discount lines. Existing parsed fields win on
+conflict; model output is used only when the result scores better than the parser.
+If Ollama is unreachable, the ordinary parser result is used.
+
+M3 independently checks each classifier result through Ollama. The API keeps the
+classifier's `categories` unchanged and adds `category_validation` (`agreed`,
+`disagreed`, or `uncertain`) and `suggested_categories`. Suggestions are limited
+to the classifier's known label vocabulary. If Ollama is unavailable, M3 returns
+its normal classification with `category_validation: "uncertain"`. The existing
+M3 categories remain selected when validation is uncertain.
+
 ## Разработка
 
 После клонирования настройте окружение и запустите все проверки:

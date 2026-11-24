@@ -15,6 +15,7 @@ PDF contract table (from README):
 | POST | /train | {dataset_path, model_path} | 204, service reloads |
 """
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -23,10 +24,14 @@ from typing import Annotated, cast
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from categorize.ollama import OllamaCategoryValidator
 from categorize.service import CategoryService
 from categorize.training import train_transformer
 from categorize.transformer import TransformerCategoryClassifier
-from common import ClassifiedItem, ClassifiedReceipt, Item, Receipt
+from common.contracts import Item, Receipt
+from common.models import ClassifiedItem, ClassifiedReceipt
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_DATASET_PATH = Path("categorize/data/training.csv")
 DEFAULT_MODEL_PATH = Path("categorize/models/category_transformer")
@@ -77,11 +82,18 @@ def load_service(model_path: Path = DEFAULT_MODEL_PATH) -> CategoryService:
     - Return CategoryService wrapping the classifier
     """
     if not model_path.exists():
+        logger.warning(
+            "Category model not found at %s; training from %s before serving",
+            model_path,
+            DEFAULT_DATASET_PATH,
+        )
         train_model(model_path=model_path)
     if not model_path.exists():
         msg = "model could not be trained or loaded"
         raise RuntimeError(msg)
-    return CategoryService(TransformerCategoryClassifier.load(model_path))
+    return CategoryService(
+        TransformerCategoryClassifier.load(model_path), validator=OllamaCategoryValidator()
+    )
 
 
 @asynccontextmanager

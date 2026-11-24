@@ -16,6 +16,9 @@ SERVICE_LINE_PREFIXES = (
 _DATETIME_PATTERN = re.compile(
     r"(?<!\d)(\d{2}\.\d{2}\.(?:\d{2}|\d{4})[ \t]+\d{2}:\d{2}(?::\d{2})?)(?![:\d])"
 )
+_COMPACT_DATETIME_PATTERN = re.compile(
+    r"(?<!\d)(\d{1,2})\s+(\d{1,2})\.(\d{2,4})\s+(\d{2}):(\d{2})(?::(\d{2}))?(?!\d)"
+)
 _AMOUNT_PATTERN = re.compile(
     r"(?<![\d.,+\-−])(?:[+\-−][ \u00a0]*)?"
     r"(?:\d{1,3}(?:[ \u00a0]+\d{3})+|\d+)[,.][ \u00a0]*\d{2}(?!\d|[.,][ \u00a0]*\d)"

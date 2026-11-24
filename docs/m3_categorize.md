@@ -14,8 +14,13 @@ M3 отвечает только за категоризацию товарны�
 - `categorize/service.py` — сервисный слой классификации.
 - `categorize/transformer.py` — загрузка обученной модели и inference.
 - `categorize/lexical.py` — доменная корректировка русских товарных названий.
-- `categorize/training.py` — обучение transformer-модели.
-- `categorize/external_dataset.py` — сборка обучающего CSV из Hugging Face.
+- `categorize/training.py` — обучение transformer-модели, multilabel-сплит и oversampling.
+- `categorize/manifest.py` — `model_manifest.json` с версией, хэшем датасета и метриками.
+- `categorize/prepare_dataset.py` — сборка `training_final.csv` из основного CSV и curated multilabel.
+- `categorize/baseline.py` — TF-IDF + logistic regression baseline.
+- `categorize/error_analysis.py` — разбор ошибок на holdout и ручном наборе.
+- `categorize/data_audit.py` — аудит датасетов (дубли, покрытие, multilabel).
+- `categorize/external_dataset.py` — legacy-сборка CSV из Hugging Face.
 - `categorize/dataset.py` — чтение CSV-датасета.
 - `categorize/eval.py` — оценка качества модели.
 - `categorize/__main__.py` — CLI-команды.
@@ -46,34 +51,63 @@ categorize/models/category_transformer/
 
 ## Датасет
 
-Основной обучающий CSV:
+Основной сырой CSV:
 
 ```text
-categorize/data/training.csv
+categorize/data/training_wb.csv   # 24 219 строк, 5 классов
 ```
 
-Источники данных:
+`training.csv` (110 строк) остаётся smoke-набором, `training_full.csv` —
+устаревший и для обучения не используется.
 
-- локальный seed-набор `categorize/data/items.csv`;
-- Hugging Face датасет `IvanTatarkin/ru-product-taxonomy`.
+Датасет `training_wb.csv` собран из Wildberries (`nyuuzyou/wb-products`, CC0)
+и русского среза Open Food Facts. `cafe` размечен вручную, потому что
+публичного русского датасета готовых блюд нет.
 
-Собрать датасет заново:
+Во всех исходных данных ровно одна метка на строку. Настоящие multilabel-примеры
+добавлены отдельно в `categorize/data/multilabel_curated.csv` — только там, где
+сам текст чека неоднозначен без контекста магазина (`сода` — food и household,
+`мыло` — household и personal_care, `кофе` — food и cafe). Искусственные
+комбинации не генерируются.
+
+Собрать финальный датасет:
 
 ```bash
-uv run python -m categorize build-dataset --limit 300
+uv run python -m categorize.prepare_dataset
 ```
+
+Скрипт дедуплицирует тексты, накладывает curated-метки, проверяет неизвестные
+категории и печатает распределение. Результат —
+`categorize/data/training_final.csv` (24 234 строки, 39 multilabel).
 
 ## Обучение
 
 ```bash
+uv run python -m categorize.prepare_dataset
 uv run python -m categorize train \
-  --dataset categorize/data/training.csv \
-  --model categorize/models/category_transformer
+  --dataset categorize/data/training_final.csv \
+  --model categorize/models/category_transformer \
+  --epochs 15
 ```
 
-В обучении используется multilabel-конфигурация модели. Для борьбы с
-несбалансированными классами oversampling применяется только к train-fold после
-stratified split, чтобы validation-fold не дублировался и метрики не завышались.
+Дефолт CLI — 6.0 эпох (значение из PDF). В проекте принято 15 эпох: на 6 эпохах
+модель недоучивается на коротких формах (`сыр → cafe`).
+
+В обучении используется multilabel-конфигурация модели и
+`binary_cross_entropy_with_logits` с `pos_weight` по каждому классу (вес ограничен
+5.0, чтобы редкий `cafe` не доминировал). Split — 80/20 по целым наборам меток,
+поэтому multilabel-строка не попадает одновременно в train и test. Oversampling
+применяется только к train-fold: пример повторяется по самому редкому из своих
+классов, но не более 4 раз. Validation-fold не дублируется.
+
+Baseline и разбор ошибок:
+
+```bash
+uv run python -m categorize.baseline
+uv run python -m categorize.error_analysis --split test
+uv run python -m categorize.error_analysis \
+  --dataset categorize/data/holdout_manual.csv --split all
+```
 
 Проверить сохраненную модель:
 
@@ -83,11 +117,9 @@ uv run python -m categorize eval \
   --model categorize/models/category_transformer
 ```
 
-Последний проверенный результат:
-
-```text
-accuracy=0.782 examples=110
-```
+Последний проверенный результат на честном 20 % holdout из
+`training_final.csv`: `micro_f1=0.892`, `macro_f1=0.834`, `exact_match=0.888`.
+Подробности, baseline и разбор ошибок — в `docs/m3_evaluation.md`.
 
 ## FastAPI
 

@@ -37,6 +37,20 @@ def test_format_monthly_summary_without_receipts() -> None:
     assert format_monthly_summary(summary, EN) == EN.month_empty
 
 
+def test_format_monthly_summary_includes_category_spending() -> None:
+    summary = MonthlySummary(
+        month=date(2026, 10, 1),
+        receipt_count=2,
+        total=Decimal("300"),
+        category_totals={"food": Decimal("200"), "household": Decimal("100")},
+    )
+
+    assert format_monthly_summary(summary, RU) == (
+        "Расходы за 10.2026: 300.00\nЧеков: 2\nПо категориям:\n"
+        "- food: 200.00\n- household: 100.00"
+    )
+
+
 def test_format_history_without_receipts() -> None:
     assert format_history([], RU) == RU.history_empty
 

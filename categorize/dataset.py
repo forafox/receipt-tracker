@@ -33,6 +33,8 @@ def load_training_examples(path: Path) -> list[TrainingExample]:
             TrainingExample(
                 text=row["text"].strip(),
                 category=row["category"],
+                source=(row.get("source") or None),
+                group_id=(row.get("group_id") or None),
             )
             for row in rows
             if row.get("text") and row.get("category")

@@ -37,6 +37,14 @@ categorize/data/raw/
 
 # Scratch model checkpoints
 categorize/models/category_transformer_*/
+categorize/models/local_cpu/
+extract/models/ocr_denoiser.*
 
 # OCR preview output
 ocr/_preview/
+
+# Generated merged training set
+categorize/data/training_final.csv
+
+# Generated M3 reports
+reports/

@@ -149,6 +149,48 @@ contain extra flags; an existing `--psm` is replaced by each candidate mode.
 Adaptive mode costs up to three Tesseract runs per photo but handles different
 receipt layouts without changing configuration.
 
+### Optional HunyuanOCR-1.5 vision OCR from WSL
+
+HunyuanOCR-1.5 runs locally through `llama.cpp` on CPU and is enabled by default.
+Its complete line transcription is adapted to `OcrResult`; M2 then
+extracts the receipt fields and items. If Hunyuan returns text M2 can parse,
+that result is used unconditionally and other OCR engines are not run. The
+configured Tesseract/EasyOCR candidate is used only when Hunyuan is unavailable
+or M2 cannot parse its output.
+The WSL Q8 model and vision projector together download about 1.31 GB. On a
+4-core CPU and 4.7 GB free RAM, the tested receipt took 237 seconds and the
+server used about 2.1 GB RSS; set the timeout accordingly.
+
+Build current `llama.cpp` in WSL and start the local server (the first launch
+downloads the two GGUF files from Hugging Face):
+
+```bash
+git clone --depth 1 https://github.com/ggml-org/llama.cpp.git
+cd llama.cpp
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TESTS=OFF
+cmake --build build --config Release -j2 --target llama-server
+build/bin/llama-server \
+  --hf-repo ggml-org/HunyuanOCR-GGUF:Q8_0 \
+  --host 127.0.0.1 --port 8231 --alias HunyuanOCR \
+  --ctx-size 4096 --n-predict 4096 --threads 4 --parallel 1 --jinja
+```
+
+Enable the first-choice Hunyuan candidate in `.env`:
+
+```dotenv
+OCR_HUNYUAN_OCR_ENABLED=true
+OCR_HUNYUAN_OCR_MODEL=HunyuanOCR
+OCR_HUNYUAN_OCR_URL=http://localhost:8231/v1/chat/completions
+OCR_HUNYUAN_OCR_TIMEOUT_SECONDS=600
+```
+
+If the endpoint refuses the connection or returns invalid output, the OCR
+pipeline continues with its existing engine. Hunyuan's direct
+coordinate-JSON and direct receipt-JSON modes were not reliable on the tested
+photo, so the integration requests a full text transcription and lets M2 parse
+the rows. Details and the one-photo evaluation are in
+[`hunyuanocr_evaluation.md`](hunyuanocr_evaluation.md).
+
 ### Alternative: EasyOCR (no Tesseract binary)
 
 EasyOCR is installed by the `ocr` group and does not need the system Tesseract
@@ -379,6 +421,9 @@ Notes:
 - Do not run the API and `make test-slow` at the same time if memory is tight.
 
 ## 9. Start the Telegram bot
+
+For the short WSL launch command with Hunyuan enabled, see
+[`bot.md`](bot.md).
 
 In the first terminal (repository root, where `.env` lives):
 

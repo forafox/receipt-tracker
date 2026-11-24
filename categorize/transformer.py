@@ -14,13 +14,21 @@ PDF requirements:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from categorize.manifest import load_manifest
+from categorize.text import denoise
 from common.models import CategoryPrediction, CategoryScore
+
+logger = logging.getLogger(__name__)
+
+# One threshold shared by inference and offline metrics.
+DEFAULT_THRESHOLD = 0.5
 
 
 class TransformerCategoryClassifier:
@@ -40,11 +48,35 @@ class TransformerCategoryClassifier:
         tokenizer: Any,
         id_to_label: dict[int, str],
         max_length: int = 64,
+        thresholds: dict[str, float] | None = None,
+        temperature: float = 1.0,
     ) -> None:
+        # Fail on corrupt/mismatched metadata at loading time rather than at predict().
+        num_labels = getattr(model.config, "num_labels", None)
+        if not isinstance(num_labels, int) or num_labels < 1:
+            raise ValueError("model.config.num_labels must be a positive integer")
+        if set(id_to_label) != set(range(num_labels)):
+            raise ValueError(
+                f"id_to_label must contain indices 0..{num_labels - 1}; got {sorted(id_to_label)}"
+            )
+        if any(not isinstance(label, str) or not label.strip() for label in id_to_label.values()):
+            raise ValueError("id_to_label contains an empty/non-string category")
+        if len(set(id_to_label.values())) != num_labels:
+            raise ValueError("id_to_label contains duplicate category names")
+        config_labels = getattr(model.config, "id2label", None)
+        if (
+            config_labels is not None
+            and {int(index): label for index, label in config_labels.items()} != id_to_label
+        ):
+            raise ValueError("model config id2label and metadata id_to_label disagree")
         self._model = model
         self._tokenizer = tokenizer
         self._id_to_label = id_to_label
         self._max_length = max_length
+        self._thresholds = thresholds or {}
+        if temperature <= 0:
+            raise ValueError("temperature must be positive")
+        self._temperature = temperature
         self._model.eval()
 
     @classmethod
@@ -58,6 +90,14 @@ class TransformerCategoryClassifier:
         with (path / "category_metadata.json").open(encoding="utf-8") as file:
             metadata = json.load(file)
         id_to_label = {int(key): value for key, value in metadata["id_to_label"].items()}
+        manifest = load_manifest(path)
+        if manifest is not None and manifest.label_names:
+            expected = [id_to_label[index] for index in sorted(id_to_label)]
+            if manifest.label_names != expected:
+                raise ValueError(
+                    "model_manifest.json label_names disagree with category_metadata.json"
+                )
+            logger.info("Loaded model version %s", manifest.model_version)
         tokenizer = AutoTokenizer.from_pretrained(path)
         model = AutoModelForSequenceClassification.from_pretrained(path)
         return cls(
@@ -65,17 +105,29 @@ class TransformerCategoryClassifier:
             tokenizer=tokenizer,
             id_to_label=id_to_label,
             max_length=int(metadata.get("max_length", 64)),
+            thresholds={
+                str(label): float(value) for label, value in metadata.get("thresholds", {}).items()
+            },
+            temperature=float(metadata.get("temperature", 1.0)),
         )
 
     @staticmethod
-    def save_metadata(path: Path, id_to_label: dict[int, str], max_length: int) -> None:
-        """Save category metadata to the model directory."""
+    def save_metadata(
+        path: Path,
+        id_to_label: dict[int, str],
+        max_length: int,
+        thresholds: dict[str, float] | None = None,
+        temperature: float = 1.0,
+    ) -> None:
+        """Save category metadata, calibrated thresholds and temperature."""
         path.mkdir(parents=True, exist_ok=True)
         with (path / "category_metadata.json").open("w", encoding="utf-8") as file:
             json.dump(
                 {
                     "id_to_label": {str(key): value for key, value in id_to_label.items()},
                     "max_length": max_length,
+                    "thresholds": thresholds or {},
+                    "temperature": temperature,
                 },
                 file,
                 ensure_ascii=False,
@@ -101,9 +153,12 @@ class TransformerCategoryClassifier:
             msg = "item name cannot be empty"
             raise ValueError(msg)
 
-        # Tokenize the item name
+        # OCR artifacts (VAT prefixes, homoglyphs, trailing quantities) are
+        # removed before tokenization; the model was trained on both forms.
+        cleaned = denoise(item_name) or item_name.strip()
+
         encoded = self._tokenizer(
-            item_name,
+            cleaned,
             truncation=True,
             padding=True,
             max_length=self._max_length,
@@ -113,8 +168,10 @@ class TransformerCategoryClassifier:
         with torch.no_grad():
             logits = self._model(**encoded).logits[0]
 
-        # Apply sigmoid to get probabilities for each category
-        probabilities = torch.sigmoid(logits)
+        # Sigmoid returns independent scores in [0, 1], not calibrated confidence.
+        # Per-label thresholds are tuned on the validation split; DEFAULT_THRESHOLD
+        # remains the fallback for labels absent from the metadata.
+        probabilities = torch.sigmoid(logits / self._temperature)
 
         # Build list of (category, confidence) pairs
         scores = [
@@ -125,15 +182,27 @@ class TransformerCategoryClassifier:
             for idx, prob in enumerate(probabilities.tolist())
         ]
 
-        # Filter by threshold (0.5)
-        selected = [score for score in scores if score.confidence >= 0.5]
+        selected = [
+            score
+            for score in scores
+            if score.confidence >= self._thresholds.get(score.category, DEFAULT_THRESHOLD)
+        ]
 
-        # If no category passes threshold, fall back to argmax
-        if not selected:
-            max_score = max(scores, key=lambda s: s.confidence)
-            selected = [max_score]
+        # No category passed: return argmax as an explicit, visible fallback.
+        fallback = not selected
+        if fallback:
+            selected = [max(scores, key=lambda score: score.confidence)]
 
         # Sort by confidence descending
         selected.sort(key=lambda score: score.confidence, reverse=True)
 
-        return CategoryPrediction(categories=selected)
+        return CategoryPrediction(
+            categories=selected,
+            threshold=DEFAULT_THRESHOLD,
+            fallback=fallback,
+        )
+
+    @property
+    def category_names(self) -> list[str]:
+        """Return the model's complete label vocabulary for constrained validation."""
+        return [self._id_to_label[index] for index in sorted(self._id_to_label)]

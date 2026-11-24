@@ -5,9 +5,29 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from common.contracts import Item
-from extract.parser import parse_receipt
+from common.ocr import OcrResult, TextBlock
+from extract.parser import parse_ocr_result, parse_receipt
 
 MOSCOW_TIMEZONE = ZoneInfo("Europe/Moscow")
+
+
+def _layout_result(text: str) -> OcrResult:
+    width, height = 1200, 1600
+    raw_lines = text.splitlines()
+    row_height = max(1, height // max(2 * len(raw_lines), 1))
+    blocks = []
+    for index, line in enumerate(raw_lines):
+        if not line.strip():
+            continue
+        y_min = min(height - 1, round(index * height / max(len(raw_lines), 1)))
+        y_max = min(height, max(y_min + 1, y_min + row_height))
+        blocks.append(
+            TextBlock(
+                text=line.strip(),
+                bbox=[(0, y_min), (width, y_min), (width, y_max), (0, y_max)],
+            )
+        )
+    return OcrResult(blocks=blocks, image_width=width, image_height=height)
 
 
 def test_parse_receipt_extracts_unknown_merchant_without_brand_whitelist() -> None:
@@ -42,6 +62,88 @@ def test_store_extraction_skips_service_metadata() -> None:
     assert receipt.store == "МАГАЗИН ХОРОШИХ ВЕЩЕЙ"
     assert receipt.datetime == datetime(2026, 10, 5, 10, 15, 31, tzinfo=MOSCOW_TIMEZONE)
     assert receipt.total == Decimal("350.00")
+    assert receipt.warnings == []
+
+
+def test_ocr_layout_extracts_legal_store_and_stops_at_payment_block() -> None:
+    text = """
+ООО "ЛЕНТА"
+РОССИЯ, 197350, Г. САНКТ-ПЕТЕРБУРГ,
+УЛ. ПАРАШЮТНАЯ, Д. 61, К.4, СТР.1, ПОМ.221-Н
+КАССА:0005 КАССИР:
+ДОКУМЕНТ НА ПРОДАЖУ 150 (ПРИХОД) СМЕНА N: 0156
+СЛИВКИ БОЛЬШ КРУЖКА У/ 124.99 *1 =124.99 НДС 10%
+ХЛЕБЕЦ ЭНЕР ЗДОР ПОД 3 89.99 *1 =89.99 НДС 10%
+БАНКОВСКИЕ ОПЛАТЫ
+03.11.25 20:50 ЧЕК 0131
+ПАО СБЕРБАНК ОПЛАТА
+ТЕРМИНАЛ: 39334622 МЕРЧАНТ:991000225979
+MIR (E4)*5765 A0000006581010
+СУММА(РУБ): 214.98
+ИТОГО К ОПЛАТЕ С УЧЕТОМ СКИДКИ =214.98
+СУММА НДС 10% =19.54
+БАЛАНС БАЛЛОВ НА 03-11-2025 20:50 0.00
+ЧЕК 0145 ИТОГ = 214.98
+    """
+
+    receipt = parse_ocr_result(_layout_result(text), timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.store == 'ООО "ЛЕНТА"'
+    assert receipt.datetime == datetime(2025, 11, 3, 20, 50, tzinfo=MOSCOW_TIMEZONE)
+    assert receipt.total == Decimal("214.98")
+    assert receipt.items == [
+        Item(
+            name="СЛИВКИ БОЛЬШ КРУЖКА У/",
+            quantity=Decimal("1"),
+            price=Decimal("124.99"),
+            sum=Decimal("124.99"),
+        ),
+        Item(
+            name="ХЛЕБЕЦ ЭНЕР ЗДОР ПОД 3",
+            quantity=Decimal("1"),
+            price=Decimal("89.99"),
+            sum=Decimal("89.99"),
+        ),
+    ]
+    assert receipt.warnings == []
+
+
+def test_ocr_layout_parses_pipe_delimited_item_table_before_payment() -> None:
+    text = """
+ООО "ЛЕНТА"
+РОССИЯ, 197350, Г. САНКТ-ПЕТЕРБУРГ,
+УЛ. ПАРАШЮТНАЯ Д. 60, ЛИТЕРА А
+ДОКУМЕНТ НА ПРОДАЖУ
+| КАРТОФЕЛЬ ЧИК-ЧИК СВЕЖ | 74.99 *1.000 | =74.99 НДС 10% |
+|------------------------|-------------|---------------|
+| ПАКЕТ ЛЕНТА 12КГ       | 12.99 *1     | =12.99 НДС 20% |
+BANKORPAYMENTENTITY
+КАССОВЫЙ ЧЕК
+СИСТЕМА БЫСТРЫХ ПЛАТЕЖЕЙ 05.11.2025 11:52
+ИТОГО К ОПЛАТЕ С УЧЕТОМ СКИДКИ =87.98
+СУММА НДС 10% =6.82
+ЧЕК 0091 ИТОГ =87.98
+    """
+
+    receipt = parse_ocr_result(_layout_result(text), timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.store == 'ООО "ЛЕНТА"'
+    assert receipt.datetime == datetime(2025, 11, 5, 11, 52, tzinfo=MOSCOW_TIMEZONE)
+    assert receipt.total == Decimal("87.98")
+    assert receipt.items == [
+        Item(
+            name="КАРТОФЕЛЬ ЧИК-ЧИК СВЕЖ",
+            quantity=Decimal("1.000"),
+            price=Decimal("74.99"),
+            sum=Decimal("74.99"),
+        ),
+        Item(
+            name="ПАКЕТ ЛЕНТА 12КГ",
+            quantity=Decimal("1"),
+            price=Decimal("12.99"),
+            sum=Decimal("12.99"),
+        ),
+    ]
     assert receipt.warnings == []
 
 

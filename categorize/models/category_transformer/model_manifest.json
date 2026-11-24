@@ -1,0 +1,52 @@
+{
+  "model_version": "1.1.0",
+  "base_model": "cointegrated/rubert-tiny",
+  "created_at": "2026-11-15T21:41:45.939853+00:00",
+  "dataset_path": "categorize/data/training_final.csv",
+  "dataset_sha256": "5f31c4fff85be91a3b384336bbb0d27c3a66d119fa76f1aa797d2aa674eff90f",
+  "hyperparameters": {
+    "epochs": 15,
+    "max_length": 64,
+    "learning_rate": 0.00005,
+    "per_device_train_batch_size": 8,
+    "seed": 42,
+    "best_checkpoint": "eval_loss"
+  },
+  "thresholds": {
+    "cafe": 0.8,
+    "food": 0.68,
+    "household": 0.62,
+    "medicine": 0.76,
+    "personal_care": 0.68
+  },
+  "metrics": {
+    "exact_match": 0.8020935557736343,
+    "micro_f1": 0.8783748361730012,
+    "hamming_loss": 0.060713117435394176,
+    "mean_label_recall": 0.8888343692072838,
+    "precision_cafe": 0.8733333333333333,
+    "recall_cafe": 0.9003436426116839,
+    "f1_cafe": 0.88663282571912,
+    "precision_food": 0.8689057421451788,
+    "recall_food": 0.8765027322404372,
+    "f1_food": 0.8726877040261154,
+    "precision_household": 0.8903002309468823,
+    "recall_household": 0.8761363636363636,
+    "f1_household": 0.8831615120274915,
+    "precision_medicine": 0.8648018648018648,
+    "recall_medicine": 0.85385500575374,
+    "f1_medicine": 0.859293572669369,
+    "precision_personal_care": 0.8947976878612717,
+    "recall_personal_care": 0.8968713789107764,
+    "f1_personal_care": 0.8958333333333334,
+    "macro_f1": 0.8795217895550858,
+    "eval_loss": 0.2982751727104187
+  },
+  "label_names": [
+    "cafe",
+    "food",
+    "household",
+    "medicine",
+    "personal_care"
+  ]
+}

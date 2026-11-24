@@ -43,6 +43,7 @@ class Item(BaseModel):
     quantity: Decimal | None = None
     price: Decimal | None = None
     sum: Decimal
+    categories: list[str] = Field(default_factory=list)
 
 
 class Receipt(BaseModel):
