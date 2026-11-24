@@ -46,8 +46,10 @@ def test_build_merges_curated_labels_and_reports_duplicates(tmp_path: Path) -> N
     assert stats["rows"] == 3
     assert stats["duplicate_texts_removed"] == 2
     assert stats["multilabel_rows"] == 1
-    assert {"text": "Сода", "category": "food|household"} in rows
-    assert {"text": "Мыло", "category": "household"} in rows
+    assert any(
+        row["text"].lower() == "сода" and row["category"] == "food|household" for row in rows
+    )
+    assert any(row["text"] == "Мыло" and row["category"] == "household" for row in rows)
     assert stats["missing_labels"] == ["cafe", "medicine", "personal_care"]
 
 

@@ -43,3 +43,6 @@ ocr/_preview/
 
 # Generated merged training set
 categorize/data/training_final.csv
+
+# Generated M3 reports
+reports/

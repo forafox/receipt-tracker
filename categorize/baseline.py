@@ -20,7 +20,8 @@ from sklearn.multiclass import OneVsRestClassifier
 from transformers.trainer_utils import EvalPrediction
 
 from categorize.dataset import load_training_examples
-from categorize.training import _compute_metrics, _stratified_split
+from categorize.text import denoise
+from categorize.training import _compute_metrics, _stratified_split, tune_thresholds
 
 DEFAULT_DATASET = Path("categorize/data/training_final.csv")
 DEFAULT_OUTPUT = Path("categorize/models/baseline_metrics.json")
@@ -41,25 +42,37 @@ def run(dataset_path: Path, output: Path) -> dict[str, float]:
         {
             "text": [example.text for example in examples],
             "labels": [_label_vector(example.category, label_to_id) for example in examples],
+            "group_id": [
+                example.group_id or example.text.casefold().strip() for example in examples
+            ],
         }
     )
-    train, test = _stratified_split(dataset, test_size=0.2)
+    train_pool, test = _stratified_split(dataset, test_size=0.2)
+    train, validation = _stratified_split(train_pool, test_size=0.1)
 
     vectorizer = TfidfVectorizer(ngram_range=(1, 2), min_df=2, sublinear_tf=True)
-    train_features = vectorizer.fit_transform(train["text"])
-    test_features = vectorizer.transform(test["text"])
+    train_features = vectorizer.fit_transform([denoise(text) for text in train["text"]])
+    validation_features = vectorizer.transform([denoise(text) for text in validation["text"]])
+    test_features = vectorizer.transform([denoise(text) for text in test["text"]])
 
     classifier = OneVsRestClassifier(
         LogisticRegression(max_iter=1000, class_weight="balanced", random_state=42)
     )
     classifier.fit(train_features, np.asarray(train["labels"]))
+    validation_scores = classifier.decision_function(validation_features)
+    validation_probabilities = 1 / (1 + np.exp(-validation_scores))
+    validation_labels = np.asarray(validation["labels"])
+    thresholds = tune_thresholds(validation_probabilities, validation_labels, labels)
     scores = classifier.decision_function(test_features)
 
     metrics = _compute_metrics(
         EvalPrediction(predictions=scores, label_ids=np.asarray(test["labels"])),
         label_names=labels,
+        thresholds=[thresholds[label] for label in labels],
     )
+    metrics.update({f"threshold_{label}": value for label, value in thresholds.items()})
     metrics["train_size"] = float(len(train))
+    metrics["validation_size"] = float(len(validation))
     metrics["test_size"] = float(len(test))
 
     output.parent.mkdir(parents=True, exist_ok=True)

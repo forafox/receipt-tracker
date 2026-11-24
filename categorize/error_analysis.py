@@ -32,6 +32,9 @@ def _test_fold(dataset_path: Path) -> list[TrainingExample]:
                 [1.0 if label.strip() in example.category.split("|") else 0.0 for label in labels]
                 for example in examples
             ],
+            "group_id": [
+                example.group_id or example.text.casefold().strip() for example in examples
+            ],
         }
     )
     _, test = _stratified_split(dataset, test_size=0.2)

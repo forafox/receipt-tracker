@@ -12,6 +12,7 @@ dependencies = [
     "opencv-python>=5.0.0.93",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.5",
+    "tokenizers>=0.23.0",
     "torch>=2.9.0",
     "transformers>=4.57.0",
 ]

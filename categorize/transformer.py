@@ -22,6 +22,7 @@ import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from categorize.manifest import load_manifest
+from categorize.text import denoise
 from common.models import CategoryPrediction, CategoryScore
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,8 @@ class TransformerCategoryClassifier:
         tokenizer: Any,
         id_to_label: dict[int, str],
         max_length: int = 64,
+        thresholds: dict[str, float] | None = None,
+        temperature: float = 1.0,
     ) -> None:
         # Fail on corrupt/mismatched metadata at loading time rather than at predict().
         num_labels = getattr(model.config, "num_labels", None)
@@ -70,6 +73,10 @@ class TransformerCategoryClassifier:
         self._tokenizer = tokenizer
         self._id_to_label = id_to_label
         self._max_length = max_length
+        self._thresholds = thresholds or {}
+        if temperature <= 0:
+            raise ValueError("temperature must be positive")
+        self._temperature = temperature
         self._model.eval()
 
     @classmethod
@@ -98,17 +105,29 @@ class TransformerCategoryClassifier:
             tokenizer=tokenizer,
             id_to_label=id_to_label,
             max_length=int(metadata.get("max_length", 64)),
+            thresholds={
+                str(label): float(value) for label, value in metadata.get("thresholds", {}).items()
+            },
+            temperature=float(metadata.get("temperature", 1.0)),
         )
 
     @staticmethod
-    def save_metadata(path: Path, id_to_label: dict[int, str], max_length: int) -> None:
-        """Save category metadata to the model directory."""
+    def save_metadata(
+        path: Path,
+        id_to_label: dict[int, str],
+        max_length: int,
+        thresholds: dict[str, float] | None = None,
+        temperature: float = 1.0,
+    ) -> None:
+        """Save category metadata, calibrated thresholds and temperature."""
         path.mkdir(parents=True, exist_ok=True)
         with (path / "category_metadata.json").open("w", encoding="utf-8") as file:
             json.dump(
                 {
                     "id_to_label": {str(key): value for key, value in id_to_label.items()},
                     "max_length": max_length,
+                    "thresholds": thresholds or {},
+                    "temperature": temperature,
                 },
                 file,
                 ensure_ascii=False,
@@ -134,9 +153,12 @@ class TransformerCategoryClassifier:
             msg = "item name cannot be empty"
             raise ValueError(msg)
 
-        # Tokenize the item name
+        # OCR artifacts (VAT prefixes, homoglyphs, trailing quantities) are
+        # removed before tokenization; the model was trained on both forms.
+        cleaned = denoise(item_name) or item_name.strip()
+
         encoded = self._tokenizer(
-            item_name,
+            cleaned,
             truncation=True,
             padding=True,
             max_length=self._max_length,
@@ -147,8 +169,9 @@ class TransformerCategoryClassifier:
             logits = self._model(**encoded).logits[0]
 
         # Sigmoid returns independent scores in [0, 1], not calibrated confidence.
-        # DEFAULT_THRESHOLD and the best-label fallback are heuristic choices.
-        probabilities = torch.sigmoid(logits)
+        # Per-label thresholds are tuned on the validation split; DEFAULT_THRESHOLD
+        # remains the fallback for labels absent from the metadata.
+        probabilities = torch.sigmoid(logits / self._temperature)
 
         # Build list of (category, confidence) pairs
         scores = [
@@ -159,7 +182,11 @@ class TransformerCategoryClassifier:
             for idx, prob in enumerate(probabilities.tolist())
         ]
 
-        selected = [score for score in scores if score.confidence >= DEFAULT_THRESHOLD]
+        selected = [
+            score
+            for score in scores
+            if score.confidence >= self._thresholds.get(score.category, DEFAULT_THRESHOLD)
+        ]
 
         # No category passed: return argmax as an explicit, visible fallback.
         fallback = not selected

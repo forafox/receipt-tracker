@@ -11,6 +11,11 @@ class TrainingExample(BaseModel):
     model_config = ConfigDict(frozen=False)
     text: str = Field(min_length=1, description="Product name or description text")
     category: str = Field(min_length=1, description="Category labels separated by |")
+    source: str | None = Field(default=None, description="Dataset or augmentation source")
+    group_id: str | None = Field(
+        default=None,
+        description="Split group; variants of the same product share it",
+    )
 
 
 __all__ = [

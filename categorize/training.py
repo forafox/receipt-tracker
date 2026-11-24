@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import inspect
 import random
+import shutil
 from collections import defaultdict
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -30,6 +31,7 @@ from categorize.manifest import (
     sha256_file,
 )
 from categorize.schemas import TrainingExample
+from categorize.text import denoise
 from categorize.transformer import DEFAULT_THRESHOLD, TransformerCategoryClassifier
 
 # Compatibility shim: transformers 4.39 passes arguments such as
@@ -81,16 +83,25 @@ def train_transformer(
     id_to_label = {index: label for label, index in label_to_id.items()}
     tokenizer = AutoTokenizer.from_pretrained(base_model)
     dataset = _build_dataset(examples, label_to_id)
-    train_dataset, eval_dataset = _stratified_split(dataset, test_size=0.2)
+    train_pool, _test_dataset = _stratified_split(dataset, test_size=0.2)
+    train_dataset, validation_dataset = _stratified_split(train_pool, test_size=0.1)
     train_dataset = _oversample_training_dataset(train_dataset)
     pos_weight = _compute_pos_weight(train_dataset)
 
     tokenized_train = train_dataset.map(
-        lambda batch: tokenizer(batch["text"], truncation=True, max_length=max_length),
+        lambda batch: tokenizer(
+            [denoise(text) for text in batch["text"]],
+            truncation=True,
+            max_length=max_length,
+        ),
         batched=True,
     )
-    tokenized_eval = eval_dataset.map(
-        lambda batch: tokenizer(batch["text"], truncation=True, max_length=max_length),
+    tokenized_validation = validation_dataset.map(
+        lambda batch: tokenizer(
+            [denoise(text) for text in batch["text"]],
+            truncation=True,
+            max_length=max_length,
+        ),
         batched=True,
     )
 
@@ -101,12 +112,13 @@ def train_transformer(
         label2id=label_to_id,
         problem_type="multi_label_classification",
     )
-    args = _build_training_arguments(output_dir, epochs)
+    checkpoint_dir = output_dir / "_trainer"
+    args = _build_training_arguments(checkpoint_dir, epochs)
     trainer_kwargs: dict[str, Any] = {
         "model": model,
         "args": args,
         "train_dataset": tokenized_train,
-        "eval_dataset": tokenized_eval,
+        "eval_dataset": tokenized_validation,
         "data_collator": DataCollatorWithPadding(tokenizer=tokenizer),
         "compute_metrics": functools.partial(_compute_metrics, label_names=labels),
     }
@@ -116,11 +128,31 @@ def train_transformer(
         trainer_kwargs["tokenizer"] = tokenizer
     trainer = _WeightedTrainer(**trainer_kwargs, pos_weight=pos_weight)
     trainer.train()
+
+    evaluation = trainer.evaluate()
+    prediction = trainer.predict(tokenized_validation)
+    probabilities = 1 / (1 + np.exp(-np.asarray(prediction.predictions)))
+    label_ids = prediction.label_ids
+    if label_ids is None:
+        raise RuntimeError("trainer.predict returned no labels")
+    thresholds = tune_thresholds(probabilities, np.asarray(label_ids), labels)
+    metrics = _compute_metrics(
+        EvalPrediction(predictions=prediction.predictions, label_ids=label_ids),
+        label_names=labels,
+        thresholds=[thresholds[label] for label in labels],
+    )
+    metrics["eval_loss"] = float(evaluation.get("eval_loss", 0.0))
+
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(output_dir)
-    TransformerCategoryClassifier.save_metadata(output_dir, id_to_label, max_length)
+    shutil.rmtree(checkpoint_dir, ignore_errors=True)
+    TransformerCategoryClassifier.save_metadata(
+        output_dir,
+        id_to_label,
+        max_length,
+        thresholds=thresholds,
+    )
 
-    metrics = trainer.evaluate()
     manifest = ModelManifest(
         model_version=MODEL_VERSION,
         base_model=base_model,
@@ -133,13 +165,10 @@ def train_transformer(
             "learning_rate": 5e-5,
             "per_device_train_batch_size": 8,
             "seed": 42,
+            "best_checkpoint": "eval_loss",
         },
-        thresholds={"default": DEFAULT_THRESHOLD},
-        metrics={
-            key.removeprefix("eval_"): float(value)
-            for key, value in metrics.items()
-            if isinstance(value, (int, float))
-        },
+        thresholds=thresholds,
+        metrics={key: float(value) for key, value in metrics.items()},
         label_names=labels,
     )
     save_manifest(output_dir, manifest)
@@ -153,13 +182,17 @@ def _build_training_arguments(output_dir: Path, epochs: float) -> TrainingArgume
     """
     kwargs: dict[str, Any] = {
         "output_dir": str(output_dir),
-        "save_strategy": "no",
         "learning_rate": 5e-5,
         "per_device_train_batch_size": 8,
         "per_device_eval_batch_size": 8,
         "num_train_epochs": epochs,
         "weight_decay": 0.01,
-        "load_best_model_at_end": False,
+        "load_best_model_at_end": True,
+        "metric_for_best_model": "eval_loss",
+        "greater_is_better": False,
+        "save_strategy": "epoch",
+        "save_total_limit": 1,
+        "warmup_ratio": 0.06,
         "logging_steps": 5,
         "report_to": [],
         "seed": 42,
@@ -209,6 +242,9 @@ def _build_dataset(examples: list[TrainingExample], label_to_id: dict[str, int])
         {
             "text": [example.text for example in examples],
             "labels": [_multi_hot(_example_labels(example), label_to_id) for example in examples],
+            "group_id": [
+                example.group_id or example.text.casefold().strip() for example in examples
+            ],
         }
     )
 
@@ -234,55 +270,75 @@ def _oversample_training_dataset(dataset: Dataset) -> Dataset:
 
 
 def _stratified_split(dataset: Dataset, test_size: float) -> tuple[Dataset, Dataset]:
-    """Split by whole label sets so multilabel rows are not torn apart."""
+    """Split by groups and whole label sets.
+
+    Rows that share a ``group_id`` (clean/noisy/short variants of the same
+    product) always land in the same fold.  Groups are stratified by the union
+    of their label sets so a multilabel row is never torn apart and every label
+    is represented in the evaluation fold.
+    """
+    vectors = [tuple(row) for row in dataset["labels"]]
     label_sets = [
-        tuple(index for index, value in enumerate(vector) if value >= 0.5)
-        for vector in dataset["labels"]
+        tuple(index for index, value in enumerate(vector) if value >= 0.5) for vector in vectors
     ]
-    groups: defaultdict[tuple[int, ...], list[int]] = defaultdict(list)
-    for index, label_set in enumerate(label_sets):
-        groups[label_set].append(index)
+    group_keys = (
+        list(dataset["group_id"])
+        if "group_id" in dataset.column_names
+        else [str(index) for index in range(len(dataset))]
+    )
+    groups: defaultdict[str, list[int]] = defaultdict(list)
+    for index, key in enumerate(group_keys):
+        groups[str(key)].append(index)
+
+    signatures: dict[str, tuple[int, ...]] = {}
+    for key, indices in groups.items():
+        union = {label for index in indices for label in label_sets[index]}
+        signatures[key] = tuple(sorted(union))
+
+    by_signature: defaultdict[tuple[int, ...], list[str]] = defaultdict(list)
+    for key, signature in signatures.items():
+        by_signature[signature].append(key)
 
     rng = random.Random(42)
-    train_indices: list[int] = []
-    test_indices: list[int] = []
-    for label_set in sorted(groups):
-        indices = groups[label_set]
-        rng.shuffle(indices)
-        if len(indices) < 2:
-            train_indices.extend(indices)
+    train_groups: set[str] = set()
+    test_groups: set[str] = set()
+    for signature in sorted(by_signature):
+        keys = sorted(by_signature[signature])
+        rng.shuffle(keys)
+        if len(keys) < 2:
+            train_groups.update(keys)
             continue
-        test_count = max(1, int(round(len(indices) * test_size)))
-        test_indices.extend(indices[:test_count])
-        train_indices.extend(indices[test_count:])
+        test_count = max(1, int(round(len(keys) * test_size)))
+        test_groups.update(keys[:test_count])
+        train_groups.update(keys[test_count:])
 
-    # A rare label may sit in a one-example group; make sure it is evaluated.
-    test_labels = {label for index in test_indices for label in label_sets[index]}
-    all_labels = {label for label_set in groups for label in label_set}
-    train_counts: dict[int, int] = defaultdict(int)
-    for index in train_indices:
-        for label in label_sets[index]:
-            train_counts[label] += 1
+    # A rare label may sit in a one-group signature; make sure it is evaluated.
+    test_labels = {label for key in test_groups for label in signatures[key]}
+    all_labels = {label for signature in signatures.values() for label in signature}
     for label in sorted(all_labels - test_labels):
-        movable = next(
-            (index for index in train_indices if label in label_sets[index]),
-            None,
-        )
-        if movable is not None and train_counts[label] > 1:
-            train_indices.remove(movable)
-            test_indices.append(movable)
-            for moved_label in label_sets[movable]:
-                train_counts[moved_label] -= 1
+        candidates = [key for key in sorted(train_groups) if label in signatures[key]]
+        if len(candidates) > 1:
+            moved = candidates[0]
+            train_groups.remove(moved)
+            test_groups.add(moved)
+
+    train_indices = [index for key in sorted(train_groups) for index in groups[key]]
+    test_indices = [index for key in sorted(test_groups) for index in groups[key]]
     return dataset.select(train_indices), dataset.select(test_indices)
 
 
 def _compute_metrics(
-    eval_pred: EvalPrediction, label_names: Sequence[str] = ()
+    eval_pred: EvalPrediction,
+    label_names: Sequence[str] = (),
+    thresholds: Sequence[float] | None = None,
 ) -> dict[str, float]:
     logits = np.asarray(eval_pred.predictions)
     labels = np.asarray(eval_pred.label_ids)
     probabilities = 1 / (1 + np.exp(-logits))
-    predictions = (probabilities >= DEFAULT_THRESHOLD).astype(int)
+    cutoffs = np.asarray(thresholds if thresholds is not None else [DEFAULT_THRESHOLD])
+    if cutoffs.size == 1:
+        cutoffs = np.full(labels.shape[1], float(cutoffs[0]))
+    predictions = (probabilities >= cutoffs).astype(int)
     for index, row in enumerate(predictions):
         if not row.any():
             row[int(probabilities[index].argmax())] = 1
@@ -293,9 +349,22 @@ def _compute_metrics(
     precision = true_positive / predicted_positive if predicted_positive else 0.0
     recall = true_positive / actual_positive if actual_positive else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    hamming = float((predictions != labels).mean())
+    mean_label_recall = float(
+        sum(
+            float((row * target).sum() / target.sum()) if target.sum() else 0.0
+            for row, target in zip(predictions, labels, strict=True)
+        )
+        / max(1, len(predictions))
+    )
 
     per_label_f1: list[float] = []
-    metrics: dict[str, float] = {"exact_match": float(exact_match), "micro_f1": float(f1)}
+    metrics: dict[str, float] = {
+        "exact_match": float(exact_match),
+        "micro_f1": float(f1),
+        "hamming_loss": hamming,
+        "mean_label_recall": mean_label_recall,
+    }
     for column in range(labels.shape[1]):
         tp = float((predictions[:, column] * labels[:, column]).sum())
         predicted = float(predictions[:, column].sum())
@@ -314,6 +383,36 @@ def _compute_metrics(
         metrics[f"f1_{name}"] = float(column_f1)
     metrics["macro_f1"] = float(np.mean(per_label_f1)) if per_label_f1 else 0.0
     return metrics
+
+
+def tune_thresholds(
+    probabilities: np.ndarray,
+    labels: np.ndarray,
+    label_names: Sequence[str],
+    minimum_support: int = 5,
+) -> dict[str, float]:
+    """Pick a per-label sigmoid cutoff that maximises F1 on validation rows."""
+    thresholds: dict[str, float] = {}
+    for column, name in enumerate(label_names):
+        target = labels[:, column] >= 0.5
+        if int(target.sum()) < minimum_support:
+            thresholds[name] = DEFAULT_THRESHOLD
+            continue
+        best_threshold = DEFAULT_THRESHOLD
+        best_f1 = -1.0
+        for cutoff in np.arange(0.1, 0.901, 0.02):
+            predicted = probabilities[:, column] >= cutoff
+            true_positive = float((predicted & target).sum())
+            predicted_positive = float(predicted.sum())
+            actual_positive = float(target.sum())
+            precision = true_positive / predicted_positive if predicted_positive else 0.0
+            recall = true_positive / actual_positive if actual_positive else 0.0
+            f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+            if f1 > best_f1:
+                best_f1 = f1
+                best_threshold = float(cutoff)
+        thresholds[name] = round(best_threshold, 2)
+    return thresholds
 
 
 def _example_labels(example: TrainingExample) -> list[str]:

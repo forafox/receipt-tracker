@@ -54,9 +54,11 @@ class _FakeTokenizer:
         }
 
 
-def _classifier(weights: list[float]) -> TransformerCategoryClassifier:
+def _classifier(
+    weights: list[float], thresholds: dict[str, float] | None = None
+) -> TransformerCategoryClassifier:
     model = _FakeModel(weights, LABELS)
-    return TransformerCategoryClassifier(model, _FakeTokenizer(), LABELS)
+    return TransformerCategoryClassifier(model, _FakeTokenizer(), LABELS, thresholds=thresholds)
 
 
 def test_classified_models_extend_canonical_contracts() -> None:
@@ -91,6 +93,15 @@ def test_independent_labels_above_threshold_are_all_returned() -> None:
     prediction = _classifier([4.0, 4.0, -4.0, -4.0, -4.0]).predict("soap")
     assert {score.category for score in prediction.categories} == {"food", "household"}
     assert prediction.fallback is False
+
+
+def test_per_label_thresholds_are_applied() -> None:
+    classifier = _classifier(
+        [0.0, 0.0, -9.0, -9.0, -9.0],
+        thresholds={"food": 0.6, "household": 0.4},
+    )
+    prediction = classifier.predict("item")
+    assert {score.category for score in prediction.categories} == {"household"}
 
 
 def test_low_confidence_falls_back_to_argmax_visibly() -> None:
