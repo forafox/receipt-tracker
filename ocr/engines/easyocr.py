@@ -7,6 +7,7 @@ from typing import Any
 from common.ocr import OcrResult, TextBlock
 from ocr.core.errors import OcrEngineUnavailableError
 from ocr.core.image import decode_image
+from ocr.core.observability import log_detected_text
 from ocr.core.ordering import blocks_to_text
 from ocr.core.postprocess import PostprocessSettings, postprocess_blocks
 from ocr.core.quality import QualityThresholds, ensure_quality
@@ -92,7 +93,9 @@ class EasyOcrEngine:
             )
         if self._postprocess is not None:
             blocks = postprocess_blocks(blocks, self._postprocess)
-        return OcrResult(blocks=blocks, image_width=width, image_height=height)
+        result = OcrResult(blocks=blocks, image_width=width, image_height=height)
+        log_detected_text(self.name, result)
+        return result
 
     def recognize(self, image: bytes) -> str:
         """Recognize receipt text as plain text.
