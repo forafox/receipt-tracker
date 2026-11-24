@@ -165,9 +165,7 @@ async def test_hunyuan_candidate_is_absolute_priority_when_parseable(
     )
     hunyuan = FakeRecognizer("05.10.2026 18:20\nМОЛОКО 100.00\nИТОГО 100.00")
     hunyuan.name = "hunyuan_ocr"
-    regex = FakeRecognizer(
-        "ПЯТЁРОЧКА\n05.10.2026 18:20\nМОЛОКО 40.00\nХЛЕБ 60.00\nИТОГО 100.00"
-    )
+    regex = FakeRecognizer("ПЯТЁРОЧКА\n05.10.2026 18:20\nМОЛОКО 40.00\nХЛЕБ 60.00\nИТОГО 100.00")
     pipeline = ReceiptPipeline(regex, FakeStorage(), MOSCOW_TIMEZONE, recognizers=[hunyuan, regex])
 
     _, receipt, _, _ = await pipeline._read_receipt(b"image")
@@ -180,9 +178,7 @@ async def test_hunyuan_candidate_is_absolute_priority_when_parseable(
 async def test_regex_candidate_is_used_when_hunyuan_endpoint_is_unavailable() -> None:
     hunyuan = FailingRecognizer(OcrEngineUnavailableError("connection refused"))
     hunyuan.name = "hunyuan_ocr"
-    regex = FakeRecognizer(
-        "ПЯТЁРОЧКА\n05.10.2026 18:20\nМОЛОКО 100.00\nИТОГО 100.00"
-    )
+    regex = FakeRecognizer("ПЯТЁРОЧКА\n05.10.2026 18:20\nМОЛОКО 100.00\nИТОГО 100.00")
     pipeline = ReceiptPipeline(regex, FakeStorage(), MOSCOW_TIMEZONE, recognizers=[hunyuan, regex])
 
     _, receipt, _, _ = await pipeline._read_receipt(b"image")
@@ -315,6 +311,11 @@ async def test_monthly_summary_aggregates_saved_categories() -> None:
                     sum=Decimal("60"),
                     categories=["household", "personal_care"],
                 ),
+                Item(
+                    name="АКЦИЗНЫЙ ТОВАР",
+                    sum=Decimal("0.01"),
+                    categories=["medicine", "cafe"],
+                ),
             ]
         ),
         RECEIVED_AT,
@@ -326,6 +327,8 @@ async def test_monthly_summary_aggregates_saved_categories() -> None:
         "food": Decimal("100"),
         "household": Decimal("30"),
         "personal_care": Decimal("30"),
+        "medicine": Decimal("0.01"),
+        "cafe": Decimal("0.00"),
     }
 
 

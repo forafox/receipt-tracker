@@ -5,7 +5,7 @@ from typing import Protocol
 from categorize.classifier import CategoryClassifier
 from categorize.ollama import CategoryValidation
 from common.contracts import Item, Receipt
-from common.models import CategoryScore, ClassifiedItem, ClassifiedReceipt
+from common.models import CategoryPrediction, CategoryScore, ClassifiedItem, ClassifiedReceipt
 
 
 class CategoryValidator(Protocol):
@@ -31,13 +31,16 @@ class CategoryService:
 
     def classify_item(self, item: Item) -> ClassifiedItem:
         prediction = self._classifier.predict(item.name)
+        return self._classified_item(item, prediction)
+
+    def _classified_item(self, item: Item, prediction: CategoryPrediction) -> ClassifiedItem:
         validation = (
             self._validate_category(item.name, prediction.categories)
             if self._validator is not None
             else CategoryValidation(status="uncertain", categories=[])
         )
         return ClassifiedItem(
-            **item.model_dump(),
+            **item.model_dump(exclude={"categories"}),
             categories=prediction.categories,
             category_validation=validation.status,
             suggested_categories=validation.categories,
@@ -52,6 +55,15 @@ class CategoryService:
         return self._validator.validate(item_name, predicted, allowed)
 
     def classify_items(self, items: list[Item]) -> list[ClassifiedItem]:
+        predict_many = getattr(self._classifier, "predict_many", None)
+        if callable(predict_many):
+            predictions = predict_many([item.name for item in items])
+            if len(predictions) != len(items):
+                raise ValueError("batch classifier returned a different number of predictions")
+            return [
+                self._classified_item(item, prediction)
+                for item, prediction in zip(items, predictions, strict=True)
+            ]
         return [self.classify_item(item) for item in items]
 
     def classify_receipt(self, receipt: Receipt) -> ClassifiedReceipt:

@@ -43,14 +43,16 @@ class _FakeModel:
         return self
 
     def __call__(self, **_: object) -> _FakeOutput:
-        return _FakeOutput(self._logits)
+        batch_size = len(_.get("input_ids", [0]))
+        return _FakeOutput(self._logits.repeat(batch_size, 1))
 
 
 class _FakeTokenizer:
-    def __call__(self, *_: object, **__: object) -> dict[str, torch.Tensor]:
+    def __call__(self, texts: object, **__: object) -> dict[str, torch.Tensor]:
+        batch_size = len(texts) if isinstance(texts, list) else 1
         return {
-            "input_ids": torch.tensor([[1, 2, 3]]),
-            "attention_mask": torch.tensor([[1, 1, 1]]),
+            "input_ids": torch.tensor([[1, 2, 3]] * batch_size),
+            "attention_mask": torch.tensor([[1, 1, 1]] * batch_size),
         }
 
 
@@ -108,6 +110,15 @@ def test_low_confidence_falls_back_to_argmax_visibly() -> None:
     prediction = _classifier([-4.0, -4.0, -4.0, -4.0, -3.0]).predict("unknown")
     assert [score.category for score in prediction.categories] == ["cafe"]
     assert prediction.fallback is True
+
+
+def test_batch_predictions_match_single_predictions() -> None:
+    classifier = _classifier([4.0, 4.0, -4.0, -4.0, -4.0])
+
+    batched = classifier.predict_many(["milk", "soap"])
+
+    assert batched == [classifier.predict("milk"), classifier.predict("soap")]
+    assert classifier.predict_many([]) == []
 
 
 def test_empty_name_raises() -> None:

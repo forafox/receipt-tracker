@@ -202,6 +202,47 @@ class TransformerCategoryClassifier:
             fallback=fallback,
         )
 
+    def predict_many(self, item_names: list[str]) -> list[CategoryPrediction]:
+        """Classify a batch of item names with one model forward pass."""
+        if not item_names:
+            return []
+        if any(not item_name.strip() for item_name in item_names):
+            raise ValueError("item names cannot be empty or whitespace-only")
+        cleaned = [denoise(name) or name.strip() for name in item_names]
+        encoded = self._tokenizer(
+            cleaned,
+            truncation=True,
+            padding=True,
+            max_length=self._max_length,
+            return_tensors="pt",
+        )
+        with torch.no_grad():
+            logits = self._model(**encoded).logits
+        probabilities = torch.sigmoid(logits / self._temperature).tolist()
+        predictions = []
+        for row in probabilities:
+            scores = [
+                CategoryScore(category=self._id_to_label[index], confidence=round(float(value), 4))
+                for index, value in enumerate(row)
+            ]
+            selected = [
+                score
+                for score in scores
+                if score.confidence >= self._thresholds.get(score.category, DEFAULT_THRESHOLD)
+            ]
+            fallback = not selected
+            if fallback:
+                selected = [max(scores, key=lambda score: score.confidence)]
+            selected.sort(key=lambda score: score.confidence, reverse=True)
+            predictions.append(
+                CategoryPrediction(
+                    categories=selected,
+                    threshold=DEFAULT_THRESHOLD,
+                    fallback=fallback,
+                )
+            )
+        return predictions
+
     @property
     def category_names(self) -> list[str]:
         """Return the model's complete label vocabulary for constrained validation."""

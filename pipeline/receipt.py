@@ -4,13 +4,13 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, tzinfo
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 from functools import partial
 from itertools import count
 
+from categorize.service import CategoryService
 from common.contracts import Receipt, ReceiptWarning
 from common.ocr import OcrEngine, OcrResult
-from categorize.service import CategoryService
 from extract.agent import parse_with_agent
 from ocr import ImageDecodeError, ImageTooLargeError, OcrError
 from storage import ReceiptStorage
@@ -118,6 +118,7 @@ class ReceiptPipeline:
             storage: Storage for parsed receipts.
             timezone: Timezone of the local time printed on receipts and of month boundaries.
             recognizers: Optional OCR candidates. When omitted, ``recognizer`` is the only one.
+            category_service: Optional M3 classifier; when absent, saved items stay uncategorized.
 
         Raises:
             ValueError: If an explicit empty recognizer sequence is supplied.
@@ -182,7 +183,9 @@ class ReceiptPipeline:
                     }
                 )
             except Exception:
-                logger.exception("M3 category classification failed; saving receipt without categories")
+                logger.exception(
+                    "M3 category classification failed; saving receipt without categories"
+                )
         purchased_at = receipt.datetime or received_at
         save_started = time.perf_counter()
         saved = await asyncio.to_thread(self._storage.save, user_id, receipt, purchased_at)
@@ -222,9 +225,7 @@ class ReceiptPipeline:
 
             parse_started = time.perf_counter()
             try:
-                receipt = await asyncio.to_thread(
-                    parse_with_agent, result, timezone=self._timezone
-                )
+                receipt = await asyncio.to_thread(parse_with_agent, result, timezone=self._timezone)
             except ValueError as error:
                 errors.append(error)
                 continue
@@ -310,9 +311,15 @@ class ReceiptPipeline:
             for item in receipt.items:
                 if not item.categories:
                     continue
-                share = item.sum / len(item.categories)
-                for category in item.categories:
-                    category_totals[category] = category_totals.get(category, Decimal(0)) + share
+                share = (item.sum / len(item.categories)).quantize(
+                    Decimal("0.01"), rounding=ROUND_DOWN
+                )
+                remainder = item.sum - share * len(item.categories)
+                for index, category in enumerate(item.categories):
+                    allocated = share + (remainder if index == 0 else Decimal(0))
+                    category_totals[category] = (
+                        category_totals.get(category, Decimal(0)) + allocated
+                    )
         return MonthlySummary(
             month=start.date(),
             receipt_count=len(receipts),

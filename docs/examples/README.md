@@ -16,3 +16,19 @@ These are ten real test-split receipt images from `cdek-ocr/receipt-ocr-ru`, wit
 | IMG_1685_enh | Lenta zero-total receipt with loyalty balance footer |
 
 The image and transcript are original evaluation artifacts. Transcripts may contain OCR errors, omissions, or repeated output; they are preserved verbatim for reproducibility.
+
+## Category spending end-to-end run
+
+`category_spending_e2e.json` records an in-process end-to-end run over all ten images. The
+photo handler received each image through the bot's download path, replayed its saved HunyuanOCR
+transcript, parsed M2, classified items with the checked-in M3 transformer, saved receipts to
+temporary SQLite, and answered `/month`. The runner independently checks receipt counts, receipt
+totals, and every category amount in each response against the saved records. OCR inference
+itself is not repeated, and no Telegram network messages are sent by this test.
+
+Run it from the repository root in WSL with:
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/e2e_bot_category_examples.py \
+  --report docs/examples/category_spending_e2e.json
+```

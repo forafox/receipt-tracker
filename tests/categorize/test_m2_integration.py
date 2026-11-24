@@ -49,7 +49,7 @@ def test_receipt_preserves_every_field_and_optional_values() -> None:
     assert [
         item.model_dump(exclude={"categories", "category_validation", "suggested_categories"})
         for item in result.items
-    ] == [item.model_dump() for item in incoming.items]
+    ] == [item.model_dump(exclude={"categories"}) for item in incoming.items]
     assert result.items[0].categories[0].category == "food"
     assert result.items[0].quantity is None
     assert result.items[0].price is None
@@ -75,6 +75,14 @@ def test_local_validator_is_reported_without_replacing_classifier_categories() -
     assert result.categories[0].category == "food"
     assert result.category_validation == "disagreed"
     assert result.suggested_categories == ["household"]
+
+
+def test_reclassification_replaces_categories_already_stored_on_item() -> None:
+    item = M2Item(name="Молоко", sum=Decimal("100"), categories=["household"])
+
+    result = CategoryService(FakeClassifier()).classify_item(item)
+
+    assert [score.category for score in result.categories] == ["food"]
 
 
 def test_uncertain_validation_keeps_previous_m3_category() -> None:
