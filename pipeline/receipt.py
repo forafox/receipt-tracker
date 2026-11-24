@@ -10,7 +10,7 @@ from itertools import count
 
 from common.contracts import Receipt, ReceiptWarning
 from common.ocr import OcrEngine, OcrResult
-from extract import parse_ocr_result
+from extract.agent import parse_with_agent
 from ocr import ImageDecodeError, ImageTooLargeError, OcrError
 from storage import ReceiptStorage
 
@@ -206,7 +206,9 @@ class ReceiptPipeline:
         candidates: list[tuple[OcrResult, Receipt]] = []
         for result in results:
             try:
-                receipt = parse_ocr_result(result, timezone=self._timezone)
+                receipt = await asyncio.to_thread(
+                    parse_with_agent, result, timezone=self._timezone
+                )
             except ValueError as error:
                 errors.append(error)
                 continue

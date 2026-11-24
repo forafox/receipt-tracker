@@ -201,3 +201,8 @@ class TransformerCategoryClassifier:
             threshold=DEFAULT_THRESHOLD,
             fallback=fallback,
         )
+
+    @property
+    def category_names(self) -> list[str]:
+        """Return the model's complete label vocabulary for constrained validation."""
+        return [self._id_to_label[index] for index in sorted(self._id_to_label)]

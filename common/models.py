@@ -4,6 +4,8 @@ The aliases below are kept for backwards compatibility with existing M3 imports.
 There is no second definition of Item or Receipt.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from common.contracts import Item, Receipt
@@ -26,6 +28,8 @@ class CategoryPrediction(BaseModel):
 
 class ClassifiedItem(Item):
     categories: list[CategoryScore] = Field(min_length=1)
+    category_validation: Literal["agreed", "disagreed", "uncertain"] = "uncertain"
+    suggested_categories: list[str] = Field(default_factory=list)
 
 
 class ClassifiedReceipt(Receipt):

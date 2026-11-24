@@ -24,6 +24,7 @@ from typing import Annotated, cast
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from categorize.ollama import OllamaCategoryValidator
 from categorize.service import CategoryService
 from categorize.training import train_transformer
 from categorize.transformer import TransformerCategoryClassifier
@@ -90,7 +91,9 @@ def load_service(model_path: Path = DEFAULT_MODEL_PATH) -> CategoryService:
     if not model_path.exists():
         msg = "model could not be trained or loaded"
         raise RuntimeError(msg)
-    return CategoryService(TransformerCategoryClassifier.load(model_path))
+    return CategoryService(
+        TransformerCategoryClassifier.load(model_path), validator=OllamaCategoryValidator()
+    )
 
 
 @asynccontextmanager
