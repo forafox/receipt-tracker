@@ -131,10 +131,15 @@ def _is_plausible_store_line(line: str) -> bool:
 def _extract_datetime(text: str, timezone: tzinfo) -> datetime | None:
     for match in _DATETIME_PATTERN.finditer(text):
         value = " ".join(match.group(1).split())
-        date_format = "%d.%m.%Y %H:%M:%S" if value.count(":") == 2 else "%d.%m.%Y %H:%M"
-        try:
-            parsed = datetime.strptime(value, date_format)
-        except ValueError:
-            continue
-        return parsed.replace(tzinfo=timezone)
+        for date_format in (
+            "%d.%m.%Y %H:%M:%S",
+            "%d.%m.%Y %H:%M",
+            "%d.%m.%y %H:%M:%S",
+            "%d.%m.%y %H:%M",
+        ):
+            try:
+                parsed = datetime.strptime(value, date_format)
+            except ValueError:
+                continue
+            return parsed.replace(tzinfo=timezone)
     return None
