@@ -182,6 +182,229 @@ def test_bank_sum_line_is_not_an_item() -> None:
     assert receipt.items == [Item(name="МОЛОКО", sum=Decimal("100.00"))]
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("ИТОГО 100.00\nНДС 20% 16.67", Decimal("100.00")),
+        ("ИТОГО 100.00\nКАРТОЙ 200.00", Decimal("100.00")),
+        ("ХЛЕБ 50.00\nИТОГО:", None),
+    ],
+)
+def test_total_in_multiline_ocr_block_uses_logical_text_lines(
+    text: str, expected: Decimal | None
+) -> None:
+    result = _result([_block(text, 10, 60, 300)])
+    original = result.model_dump()
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.total == expected
+    assert receipt.total == parse_receipt(text, timezone=MOSCOW_TIMEZONE).total
+    assert result.model_dump() == original
+
+
+@pytest.mark.parametrize(
+    ("label", "amount", "item_amount", "expected", "warnings"),
+    [
+        ("ИТОГО:", "50.00", "50.00", "50.00", []),
+        ("К ОПЛАТЕ", "−50,00", "-50.00", "-50.00", []),
+        ("ИТОГО К ОПЛАТЕ", "=49.99", "50.00", "49.99", ["items_total_mismatch"]),
+    ],
+)
+def test_adjacent_total_amount_is_shared_by_fields_region_and_reconciliation(
+    label: str, amount: str, item_amount: str, expected: str, warnings: list[str]
+) -> None:
+    result = _result(
+        [
+            _block(f"ХЛЕБ {item_amount}", 10, 60, 260),
+            _block(label, 10, 100),
+            _block(amount, 210, 120, 60),
+        ]
+    )
+    original = result.model_dump()
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.total == Decimal(expected)
+    assert receipt.items == [Item(name="ХЛЕБ", sum=Decimal(item_amount))]
+    assert receipt.warnings == warnings
+    assert result.model_dump() == original
+    text = "\n".join(line.text for line in reconstruct_layout(result))
+    assert parse_receipt(text, timezone=MOSCOW_TIMEZONE).total is None
+
+
+@pytest.mark.parametrize(
+    ("amount", "x", "y"),
+    [
+        ("50.00", 10, 120),
+        ("50.00", 210, 160),
+        ("50.00 70.00", 210, 120),
+        ("НДС 50.00", 210, 120),
+        ("50.00 руб 70.00", 210, 120),
+    ],
+)
+def test_split_total_rejects_unrelated_or_ambiguous_amounts(
+    amount: str, x: float, y: float
+) -> None:
+    result = _result(
+        [
+            _block("ХЛЕБ 50.00", 10, 60, 260),
+            _block("ИТОГО", 110, 100),
+            _block(amount, x, y, 100),
+        ]
+    )
+
+    assert parse_ocr_result(result, timezone=MOSCOW_TIMEZONE).total is None
+
+
+def test_two_nearby_amount_rows_do_not_identify_a_unique_total() -> None:
+    result = _result(
+        [
+            _block("ХЛЕБ 50.00", 10, 60, 260),
+            _block("ИТОГО", 10, 100),
+            TextBlock(text="50.00", bbox=[(210, 112), (270, 112), (270, 116), (210, 116)]),
+            _block("70.00", 210, 116, 60),
+        ]
+    )
+
+    assert parse_ocr_result(result, timezone=MOSCOW_TIMEZONE).total is None
+
+
+def test_fuel_item_uses_printed_price_quantity_and_amount_across_ocr_blocks() -> None:
+    result = _result(
+        [
+            TextBlock(text=text, bbox=[(left, top), (right, top), (right, bottom), (left, bottom)])
+            for text, left, top, right, bottom in [
+                ("ТРК #2 Бензин неэтилированный АИ-95-К5", 126, 279, 731, 311),
+                ("40. 90 x 24.440 Л", 126, 314, 381, 364),
+                ("=999.60_A", 751, 339, 893, 365),
+            ]
+        ]
+    )
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [
+        Item(
+            name="ТРК #2 Бензин неэтилированный АИ-95-К5",
+            quantity=Decimal("24.440"),
+            price=Decimal("40.90"),
+            sum=Decimal("999.60"),
+        )
+    ]
+    assert receipt.warnings == ["total_not_found"]
+
+
+@pytest.mark.parametrize("suffix", [" А", "_A"])
+def test_quantity_first_expression_accepts_a_single_fiscal_letter(suffix: str) -> None:
+    result = _result([_block(f"ТОВАР 10.000 x 65.00 = 650.00{suffix}", 10, 60, 300)])
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [
+        Item(
+            name="ТОВАР", quantity=Decimal("10.000"), price=Decimal("65.00"), sum=Decimal("650.00")
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "tail",
+    ["700.00", "А 700.00", "НДС 20% 700.00", "НДС 20.00", ".99", "0"],
+)
+def test_price_first_expression_does_not_ignore_extra_financial_values(tail: str) -> None:
+    separator = "" if tail in {".99", "0"} else " "
+    result = _result([_block(f"ТОВАР 65.00 x 10 = 650.00{separator}{tail}", 10, 60, 400)])
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == []
+    assert receipt.warnings == ["total_not_found", "items_incomplete"]
+
+
+@pytest.mark.parametrize(
+    ("expression", "suffix", "quantity", "price", "amount"),
+    [
+        ("65.00 x 10 = 650.00", "_A", "10", "65.00", "650.00"),
+        ("10 x 65.00 = 650.00", " НДС 20 %", "10", "65.00", "650.00"),
+        ("-65.00 x 10 л = -650.00", " HAC 20%", "10", "-65.00", "-650.00"),
+        ("65.00 x 10 = 650.00", " НИС 102", "10", "65.00", "650.00"),
+        ("65.00 x 10 = 650.00", " НД", "10", "65.00", "650.00"),
+    ],
+)
+def test_financial_expression_suffixes_preserve_explicit_values(
+    expression: str, suffix: str, quantity: str, price: str, amount: str
+) -> None:
+    result = _result([_block(f"ТОВАР {expression}{suffix}", 10, 60, 400)])
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [
+        Item(name="ТОВАР", quantity=Decimal(quantity), price=Decimal(price), sum=Decimal(amount))
+    ]
+    assert receipt.warnings == ["total_not_found"]
+
+
+@pytest.mark.parametrize("suffix", ["", " НДС 20%"])
+@pytest.mark.parametrize("amount", ["650.00", "649.00"])
+def test_two_monetary_operands_do_not_assign_quantity_roles(amount: str, suffix: str) -> None:
+    result = _result(
+        [_block(f"БЕНЗИН 65.00 x 10.00 = {amount}{suffix}", 10, 60, 300)], total=amount
+    )
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [Item(name="БЕНЗИН", sum=Decimal(amount))]
+    assert receipt.warnings == ["items_incomplete"]
+
+
+@pytest.mark.parametrize("split_total", [False, True])
+def test_unknown_operand_roles_do_not_hide_a_receipt_total_mismatch(split_total: bool) -> None:
+    blocks = [_block("БЕНЗИН 65.00 x 10.00 = 650.00", 10, 60, 300)]
+    if split_total:
+        blocks += [_block("ИТОГО", 10, 100), _block("700.00", 210, 120, 60)]
+    result = _result(blocks, total=None if split_total else "700.00")
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [Item(name="БЕНЗИН", sum=Decimal("650.00"))]
+    assert receipt.total == Decimal("700.00")
+    assert receipt.warnings == ["items_incomplete", "items_total_mismatch"]
+
+
+@pytest.mark.parametrize("expression", ["10.00 л x 65.00", "65.00 x 10.00 л"])
+def test_explicit_unit_resolves_two_monetary_operands(expression: str) -> None:
+    result = _result([_block(f"БЕНЗИН {expression} = 650.00", 10, 60, 300)], total="650.00")
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [
+        Item(
+            name="БЕНЗИН", quantity=Decimal("10.00"), price=Decimal("65.00"), sum=Decimal("650.00")
+        )
+    ]
+    assert receipt.warnings == []
+
+
+def test_truncated_product_name_ending_in_hyphen_keeps_its_explicit_amounts() -> None:
+    result = _result(
+        [_block("Сельдь МЕРИДИАН филе- 169.99 * 1 =169.99 HAC 10%", 10, 60, 400)],
+        total="169.99",
+    )
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [
+        Item(
+            name="Сельдь МЕРИДИАН филе-",
+            quantity=Decimal("1"),
+            price=Decimal("169.99"),
+            sum=Decimal("169.99"),
+        )
+    ]
+    assert receipt.warnings == []
+
+
 @pytest.mark.parametrize("scale", [0.5, 3.0])
 def test_multiline_descriptions_and_quantity_rows_use_relative_geometry(scale: float) -> None:
     result = _result(

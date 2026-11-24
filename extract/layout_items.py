@@ -2,23 +2,33 @@ import re
 
 from common.contracts import Item
 from extract._text import _AMOUNT_PATTERN, _parse_decimal
-from extract.item_region import _has_unresolved_item_candidates, _select_item_candidate_indices
+from extract.item_region import (
+    _has_unresolved_item_candidates,
+    _select_item_candidate_indices,
+    _TotalBoundary,
+)
 from extract.items import _is_item_name, _parse_simple_item_line
-from extract.layout import LayoutLine
+from extract.layout import LayoutLine, _has_usable_geometry, _nearby
 
+# Fiscal letters and short tax codes can survive OCR without a readable rate.
+# A decimal rate requires %, so an additional monetary amount cannot become an annotation.
+_ITEM_SUFFIX = (
+    r"(?:[ \t]*_?[A-ZА-Я])?"
+    r"(?:[ \t]+[A-ZА-Я]{2,3}(?:[ \t]*(?:\d{1,3}(?:[.,]\d+)?[ \t]*%|\d{1,3}))?)?$"
+)
 _QUANTITY_PATTERN = re.compile(
     rf"(?<![\w.,+\-−])(?P<quantity>\d+(?:[.,]\d+)?)\s*"
-    rf"(?:кг|kg|г|g|шт\.?|л|l)?\s*[xх×*ж]\s*"
+    rf"(?P<unit>кг|kg|г|g|шт\.?|л|l)?\s*[xх×*ж]\s*"
     rf"(?P<price>{_AMOUNT_PATTERN.pattern})(?:\s*=\s*|\s+)"
-    rf"(?P<total>{_AMOUNT_PATTERN.pattern})$",
+    rf"(?P<total>{_AMOUNT_PATTERN.pattern}){_ITEM_SUFFIX}",
     re.IGNORECASE,
 )
 _PRICE_QUANTITY_PATTERN = re.compile(
     rf"(?<![\w.,+\-−])(?P<price>{_AMOUNT_PATTERN.pattern})\s*"
     rf"[xх×*«»ж]\s*"
     rf"(?P<quantity>\d+(?:[.,]\d+)?)\s*"
-    rf"(?:кг|kg|г|g|шт\.?|л|l)?\s*"
-    rf"(?:=\s*|\s+)(?P<total>{_AMOUNT_PATTERN.pattern})",
+    rf"(?P<unit>кг|kg|г|g|шт\.?|л|l)?\s*"
+    rf"(?:=\s*|\s+)(?P<total>{_AMOUNT_PATTERN.pattern}){_ITEM_SUFFIX}",
     re.IGNORECASE,
 )
 _NUMERIC_FRAGMENT = re.compile(r"[\d\s.,]+")
@@ -26,7 +36,7 @@ _PERCENT_FRAGMENT = re.compile(r"\d+(?:[.,]\d+)?\s*%")
 
 
 def _extract_layout_items(
-    lines: list[LayoutLine], *, store: str | None
+    lines: list[LayoutLine], *, store: str | None, totals: tuple[_TotalBoundary, ...] = ()
 ) -> tuple[list[Item], bool, bool]:
     """Associate adjacent descriptions with explicit amounts, without deriving values.
 
@@ -42,19 +52,22 @@ def _extract_layout_items(
     Args:
         lines: Receipt rows reconstructed from OCR geometry.
         store: Previously identified merchant header, if available.
+        totals: Recognized total boundaries retaining original row indices.
 
     Returns:
-        Items in reading order, whether every candidate independently produced a named item,
-        and whether item candidates were skipped. Fully consumed multiline descriptions are
+        Items in reading order, whether every candidate independently produced a named sum,
+        and whether candidates were skipped or quantity/price roles remain ambiguous.
+        Fully consumed multiline descriptions are
         not skipped, but conservatively leave reconciliation completeness unproven.
         All values come from explicit text; weight quantities retain their printed numeric values.
     """
     texts = [line.text for line in lines]
-    candidates = set(_select_item_candidate_indices(texts, store=store))
+    candidates = set(_select_item_candidate_indices(texts, store=store, totals=totals))
     standalone_rows: set[int] = set()
     covered_rows: set[int] = set()
     pending: list[int] = []
     items: list[Item] = []
+    ambiguous_items = False
     for index, line in enumerate(lines):
         if index not in candidates or not _has_usable_geometry(line):
             pending.clear()
@@ -72,18 +85,27 @@ def _extract_layout_items(
             uses_pending = not _is_item_name(name)
             name = _complete_name(name, [lines[row] for row in pending], line)
             quantity = _parse_decimal(quantity_match.group("quantity"))
-            if _is_item_name(name) and quantity > 0:
+            price = _parse_decimal(quantity_match.group("price"))
+            # Two nonnegative money-shaped operands have no intrinsic quantity/price order.
+            # Retain the printed sum but report the unresolved roles as incomplete.
+            ambiguous_roles = (
+                quantity_match.group("unit") is None
+                and _AMOUNT_PATTERN.fullmatch(quantity_match.group("quantity")) is not None
+                and price >= 0
+            )
+            if _is_item_name(name) and (quantity > 0 or ambiguous_roles):
                 items.append(
                     Item(
                         name=name,
-                        quantity=quantity,
-                        price=_parse_decimal(quantity_match.group("price")),
+                        quantity=None if ambiguous_roles else quantity,
+                        price=None if ambiguous_roles else price,
                         sum=_parse_decimal(quantity_match.group("total")),
                     )
                 )
                 covered_rows.add(index)
                 if uses_pending:
                     covered_rows.update(pending)
+                ambiguous_items |= ambiguous_roles
                 if has_name and len(text.splitlines()) == 1:
                     standalone_rows.add(index)
         elif item := _simple_row_item(line):
@@ -105,26 +127,8 @@ def _extract_layout_items(
     return (
         items,
         candidates.issubset(standalone_rows),
-        _has_unresolved_item_candidates(texts, candidates, covered_rows),
+        ambiguous_items or _has_unresolved_item_candidates(texts, candidates, covered_rows),
     )
-
-
-def _has_usable_geometry(line: LayoutLine) -> bool:
-    previous_right = float("-inf")
-    for block in line.blocks:
-        left = min(x for x, _ in block.bbox)
-        right = max(x for x, _ in block.bbox)
-        top = min(y for _, y in block.bbox)
-        bottom = max(y for _, y in block.bbox)
-        if right <= left or bottom <= top or left < previous_right:
-            return False
-        previous_right = right
-    return bool(line.blocks)
-
-
-def _nearby(first: LayoutLine, second: LayoutLine) -> bool:
-    height = min(first.y_max - first.y_min, second.y_max - second.y_min)
-    return 0 <= second.y_min - first.y_max <= height
 
 
 def _left_aligned(first: LayoutLine, second: LayoutLine) -> bool:

@@ -18,10 +18,10 @@ _DATETIME_PATTERN = re.compile(
 )
 _AMOUNT_PATTERN = re.compile(
     r"(?<![\d.,+\-−])(?:[+\-−][ \u00a0]*)?"
-    r"(?:\d{1,3}(?:[ \u00a0]+\d{3})+|\d+)[,.]\d{2}(?!\d)"
+    r"(?:\d{1,3}(?:[ \u00a0]+\d{3})+|\d+)[,.][ \u00a0]*\d{2}(?!\d|[.,][ \u00a0]*\d)"
 )
 _TOTAL_LABEL_PATTERN = re.compile(
-    r"(?<!\w)(?:(?:всего\s+)?к\s+оплате|итог(?:о)?)\b",
+    r"(?<!\w)(?:(?:всего\s+)?к\s+оплате|итог(?:о)?(?:\s+к\s+оплате)?)\b",
     re.IGNORECASE,
 )
 _SUM_RUB_PATTERN = re.compile(r"\(\s*руб\.?\s*\)", re.IGNORECASE)
