@@ -1,7 +1,7 @@
 import re
 
 from common.contracts import Item
-from extract._text import _AMOUNT_PATTERN, _parse_decimal
+from extract._text import _AMOUNT_PATTERN, _TOTAL_LABEL_PATTERN, _parse_decimal
 from extract.item_region import (
     _has_unresolved_item_candidates,
     _select_item_candidate_indices,
@@ -14,6 +14,7 @@ from extract.layout import LayoutLine, _has_usable_geometry, _nearby
 # A decimal rate requires %, so an additional monetary amount cannot become an annotation.
 _ITEM_SUFFIX = (
     r"(?:[ \t]*_?[A-ZА-Я])?"
+    r"(?:[ \t]*[A-ZА-Я])?"
     r"(?:[ \t]+[A-ZА-Я]{2,3}(?:[ \t]*(?:\d{1,3}(?:[.,]\d+)?[ \t]*%|\d{1,3}))?)?$"
 )
 _QUANTITY_PATTERN = re.compile(
@@ -33,6 +34,14 @@ _PRICE_QUANTITY_PATTERN = re.compile(
 )
 _NUMERIC_FRAGMENT = re.compile(r"[\d\s.,]+")
 _PERCENT_FRAGMENT = re.compile(r"\d+(?:[.,]\d+)?\s*%")
+_SEPARATE_TOTAL = re.compile(rf"=\s*(?P<amount>{_AMOUNT_PATTERN.pattern})")
+_TAX_ONLY = re.compile(r"^(?:н[дaа]с|нас)(?:\b|\s)", re.IGNORECASE)
+_BARCODE_LINE = re.compile(r"^\[м\]\s*\d{8,14}\s*", re.IGNORECASE)
+_ITEM_DESC_AMOUNT = re.compile(
+    r"^(?P<name>.+?)\s+(?P<price>\d+(?:[.,]\d{2}))\s*\*\s*(?P<quantity>\d+(?:[.,]\d+)?)\s*(?P<unit>шт\.?)?\s*$",
+    re.IGNORECASE,
+)
+_ITEM_DESC_PRICE = re.compile(r"^(?P<name>.+?)\s+(?P<price>\d+(?:[.,]\d{2}))\s*$", re.IGNORECASE)
 
 
 def _extract_layout_items(
@@ -61,7 +70,7 @@ def _extract_layout_items(
         not skipped, but conservatively leave reconciliation completeness unproven.
         All values come from explicit text; weight quantities retain their printed numeric values.
     """
-    texts = [line.text for line in lines]
+    texts = [_normalize_table_markup(line.text) for line in lines]
     candidates = set(_select_item_candidate_indices(texts, store=store, totals=totals))
     standalone_rows: set[int] = set()
     covered_rows: set[int] = set()
@@ -74,10 +83,45 @@ def _extract_layout_items(
             continue
         if pending and not _nearby(lines[pending[-1]], line):
             pending.clear()
-        text = line.text.strip()
+        text = texts[index].strip()
+        if _TAX_ONLY.match(text):
+            pending.clear()
+            continue
+        if text.casefold() in {"итог", "позиции"}:
+            pending.clear()
+            continue
+        if (
+            "|" in line.text
+            and _TOTAL_LABEL_PATTERN.fullmatch(text.strip(" |#").strip()) is not None
+        ):
+            pending.clear()
+            continue
+        description_match = _ITEM_DESC_AMOUNT.fullmatch(text)
+        if description_match and index + 1 < len(lines):
+            next_text = texts[index + 1].strip()
+            price_total = re.fullmatch(rf"=\s*(?P<amount>{_AMOUNT_PATTERN.pattern})", next_text)
+            if price_total:
+                name = description_match.group("name").strip()
+                if _is_item_name(name):
+                    items.append(Item(name=name, sum=_parse_decimal(price_total.group("amount"))))
+                    covered_rows.update((index, index + 1))
+                    continue
+        description_price = _ITEM_DESC_PRICE.fullmatch(text)
+        if description_price and index + 1 < len(lines):
+            next_line = texts[index + 1].strip()
+            if re.fullmatch(r"\d+(?:[.,]\d+)?\s*\*\s*\d+(?:[.,]\d+)?\s*(?:шт\.?\s*)?", next_line):
+                amount_match = _AMOUNT_PATTERN.search(next_line)
+                if amount_match:
+                    name = description_price.group("name").strip()
+                    if _is_item_name(name):
+                        items.append(Item(name=name, sum=_parse_decimal(amount_match.group())))
+                        covered_rows.update((index, index + 1))
+                        continue
         quantity_match = _QUANTITY_PATTERN.search(text) or _PRICE_QUANTITY_PATTERN.search(text)
         if quantity_match is not None:
             name = text[: quantity_match.start()].strip()
+            if _BARCODE_LINE.match(name):
+                name = _BARCODE_LINE.sub("", name).strip()
             if name and not (_is_item_name(name) or _PERCENT_FRAGMENT.fullmatch(name)):
                 pending.clear()
                 continue
@@ -108,16 +152,45 @@ def _extract_layout_items(
                 ambiguous_items |= ambiguous_roles
                 if has_name and len(text.splitlines()) == 1:
                     standalone_rows.add(index)
+        elif separate_total := _SEPARATE_TOTAL.fullmatch(text):
+            if pending:
+                pending_names = []
+                for row in pending:
+                    fragment = _normalize_table_markup(lines[row].text).strip()
+                    fragment = _BARCODE_LINE.sub("", fragment).strip()
+                    if fragment:
+                        pending_names.append(fragment)
+                name = " ".join(pending_names)
+                if _is_item_name(name):
+                    items.append(
+                        Item(name=name, sum=_parse_decimal(separate_total.group("amount")))
+                    )
+                    covered_rows.update([*pending, index])
+                    pending.clear()
         elif item := _simple_row_item(line):
             items.append(item)
             covered_rows.add(index)
             standalone_rows.add(index)
         elif _AMOUNT_PATTERN.fullmatch(text):
             if pending and line.x_min >= max(lines[row].x_max for row in pending):
-                name = " ".join(lines[row].text.strip() for row in pending)
+                name = " ".join(_normalize_table_markup(lines[row].text).strip() for row in pending)
                 if _is_item_name(name):
                     items.append(Item(name=name, sum=_parse_decimal(text)))
                     covered_rows.update([*pending, index])
+        elif _BARCODE_LINE.match(text):
+            product_name = _BARCODE_LINE.sub("", text).strip()
+            if product_name and _is_item_name(product_name) and index + 1 < len(lines):
+                pending.append(index)
+            else:
+                pending.clear()
+            continue
+        elif (
+            pending
+            and _BARCODE_LINE.match(_normalize_table_markup(lines[pending[-1]].text).strip())
+            and re.fullmatch(r"\d+(?:[.,]\d+)?\s*\*", text)
+        ):
+            pending.append(index)
+            continue
         elif _is_item_name(text) or _PERCENT_FRAGMENT.fullmatch(text):
             if pending and not _left_aligned(lines[pending[0]], line):
                 pending.clear()
@@ -136,6 +209,17 @@ def _left_aligned(first: LayoutLine, second: LayoutLine) -> bool:
     return abs(first.x_min - second.x_min) <= height
 
 
+def _normalize_table_markup(text: str) -> str:
+    """Turn Markdown-like OCR column separators into spaces before row parsing.
+
+    Returns:
+        Text with empty table columns omitted and remaining cells space-separated.
+    """
+    if "|" not in text:
+        return text
+    return " ".join(part.strip() for part in text.strip().strip("|").split("|") if part.strip())
+
+
 def _complete_name(name: str, pending: list[LayoutLine], line: LayoutLine) -> str:
     if not pending or _is_item_name(name):
         return name
@@ -143,10 +227,13 @@ def _complete_name(name: str, pending: list[LayoutLine], line: LayoutLine) -> st
         return name
     if not name and not pending[0].x_min <= line.x_min <= pending[0].x_max:
         return name
-    return " ".join([fragment.text.strip() for fragment in pending] + ([name] if name else []))
+    return " ".join(
+        [_normalize_table_markup(fragment.text).strip() for fragment in pending]
+        + ([name] if name else [])
+    )
 
 
 def _simple_row_item(line: LayoutLine) -> Item | None:
     if any(_NUMERIC_FRAGMENT.fullmatch(block.text.strip()) for block in line.blocks[:-1]):
         return None
-    return _parse_simple_item_line(line.text)
+    return _parse_simple_item_line(_normalize_table_markup(line.text))

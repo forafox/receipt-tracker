@@ -59,6 +59,7 @@ class Texts:
     recognition_unavailable: str
     month_empty: str
     month_spending: str
+    category_spending: str
     history_empty: str
     history_title: str
     undo_done: str
@@ -101,6 +102,7 @@ RU = Texts(
     recognition_unavailable="Распознавание временно недоступно. Попробуйте через несколько минут.",
     month_empty="В этом месяце чеков пока нет.",
     month_spending="Расходы за",
+    category_spending="По категориям",
     history_empty="Сохранённых чеков пока нет.",
     history_title="Последние чеки:",
     undo_done="Удалён чек:",
@@ -147,6 +149,7 @@ EN = Texts(
     recognition_unavailable="Recognition is temporarily unavailable. Try again in a few minutes.",
     month_empty="No receipts this month yet.",
     month_spending="Spending for",
+    category_spending="By category",
     history_empty="No saved receipts yet.",
     history_title="Recent receipts:",
     undo_done="Deleted receipt:",
@@ -226,6 +229,19 @@ def format_monthly_summary(summary: MonthlySummary, texts: Texts) -> str:
     return (
         f"{texts.month_spending} {summary.month:%m.%Y}: {summary.total:.2f}\n"
         f"{texts.receipt_count}: {summary.receipt_count}"
+        + (
+            "\n"
+            + texts.category_spending
+            + ":\n"
+            + "\n".join(
+                f"- {category}: {amount:.2f}"
+                for category, amount in sorted(
+                    (summary.category_totals or {}).items(), key=lambda entry: -entry[1]
+                )
+            )
+            if summary.category_totals
+            else ""
+        )
     )
 
 

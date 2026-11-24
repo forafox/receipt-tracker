@@ -1,0 +1,53 @@
+{
+  "receipt": {
+    "store": "ИП ПЕТРАКОВ АНТОН ВИТАЛЬЕВИЧ 535.00",
+    "datetime": "2025-10-04T22:11:00+03:00",
+    "total": null,
+    "items": [
+      {
+        "name": "Сигареты Chariman Red <265>",
+        "quantity": "1",
+        "price": "265.00",
+        "sum": "265.00"
+      },
+      {
+        "name": "Стики Kent Стикс Тропик Клик",
+        "quantity": "1",
+        "price": "200.00",
+        "sum": "200.00"
+      },
+      {
+        "name": "Леденцы Halls ментол экстра <Стронг> 25г",
+        "quantity": "1",
+        "price": "70.00",
+        "sum": "70.00"
+      }
+    ],
+    "warnings": [
+      "total_not_found"
+    ]
+  },
+  "match": {
+    "store": true,
+    "date": true,
+    "total": false,
+    "item_sum_hits": 3,
+    "item_rows": 3
+  },
+  "target": {
+    "store": "ИП ПЕТРАКОВ АНТОН ВИТАЛЬЕВИЧ",
+    "date": "04.10.25",
+    "total": "535.00",
+    "items": [
+      "Сигареты Chapman Red <265>",
+      "Стики Kent Стикс Тропик Клик",
+      "Леденцы Halls ментол экстра <Стронг> 25г"
+    ],
+    "item_sums": [
+      "265.00",
+      "200.00",
+      "70.00"
+    ]
+  },
+  "ocr_seconds": 160.93
+}

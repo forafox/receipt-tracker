@@ -1,0 +1,37 @@
+{
+  "receipt": {
+    "store": "ТК Лента-3554",
+    "datetime": "2025-10-26T17:40:00+03:00",
+    "total": "0.00",
+    "items": [
+      {
+        "name": "Печ прот SOLVIE Red Ve",
+        "quantity": "1",
+        "price": "0.00",
+        "sum": "0.00"
+      }
+    ],
+    "warnings": [
+      "items_incomplete"
+    ]
+  },
+  "match": {
+    "store": true,
+    "date": true,
+    "total": true,
+    "item_sum_hits": 1,
+    "item_rows": 1
+  },
+  "target": {
+    "store": "ООО \"ЛЕНТА\"",
+    "date": "26.10.25",
+    "total": "0.00",
+    "items": [
+      "Печ прот SOLVIE Red Ve"
+    ],
+    "item_sums": [
+      "0.00"
+    ]
+  },
+  "ocr_seconds": 214.35
+}

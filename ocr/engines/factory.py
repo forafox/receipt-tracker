@@ -58,16 +58,29 @@ def build_ocr_engines(settings: OcrSettings | None = None) -> list[OcrEngine]:
         Engines in candidate order. The list always contains at least one engine.
     """
     resolved = settings if settings is not None else OcrSettings()
-    if resolved.engine != "tesseract" or not resolved.adaptive:
-        return [build_ocr_engine(resolved)]
-    return [
-        build_ocr_engine(
-            resolved.model_copy(
-                update={"tesseract_config": _config_with_psm(resolved.tesseract_config, mode)}
+    if resolved.engine == "tesseract" and resolved.adaptive:
+        engines = [
+            build_ocr_engine(
+                resolved.model_copy(
+                    update={"tesseract_config": _config_with_psm(resolved.tesseract_config, mode)}
+                )
+            )
+            for mode in resolved.adaptive_psm_modes
+        ]
+    else:
+        engines = [build_ocr_engine(resolved)]
+    if resolved.hunyuan_ocr_enabled:
+        from ocr.engines.hunyuan_vision import HunyuanVisionEngine
+
+        engines.insert(
+            0,
+            HunyuanVisionEngine(
+                model=resolved.hunyuan_ocr_model,
+                url=resolved.hunyuan_ocr_url,
+                timeout_seconds=resolved.hunyuan_ocr_timeout_seconds,
             )
         )
-        for mode in resolved.adaptive_psm_modes
-    ]
+    return engines
 
 
 def _config_with_psm(config: str, psm: int) -> str:
