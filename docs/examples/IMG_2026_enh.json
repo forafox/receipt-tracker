@@ -8,61 +8,92 @@
         "name": "КАРТОФЕЛЬ ЧИК-ЧИК СВЕЖ",
         "quantity": "1.000",
         "price": "74.99",
-        "sum": "74.99"
+        "sum": "74.99",
+        "categories": [
+          "cafe",
+          "household"
+        ]
       },
       {
         "name": "ПАКЕТ ЛЕНТА 12КГ",
         "quantity": "1",
         "price": "12.99",
-        "sum": "12.99"
+        "sum": "12.99",
+        "categories": [
+          "household"
+        ]
       },
       {
         "name": "БЕКОН ВЕЛКОМ ДВОЙНОГО",
         "quantity": "1",
         "price": "194.99",
-        "sum": "194.99"
+        "sum": "194.99",
+        "categories": [
+          "food"
+        ]
       },
       {
         "name": "САРДЕЛЬКИ МЗ ЛОМОНОСОВ",
         "quantity": "0.402",
         "price": "854.99",
-        "sum": "343.71"
+        "sum": "343.71",
+        "categories": [
+          "household"
+        ]
       },
       {
         "name": "СЫР NAT SELEC MATURED",
         "quantity": "1",
         "price": "241.99",
-        "sum": "241.99"
+        "sum": "241.99",
+        "categories": [
+          "food"
+        ]
       },
       {
         "name": "ГЛА ЗРАЗЫ ДОМАШНИЕ КАР",
         "quantity": "0.230",
         "price": "439.99",
-        "sum": "101.20"
+        "sum": "101.20",
+        "categories": [
+          "household"
+        ]
       },
       {
         "name": "ГЛА КАМБАЛА ЖАРЕНАЯ ВЕ",
         "quantity": "0.212",
         "price": "999.99",
-        "sum": "212.00"
+        "sum": "212.00",
+        "categories": [
+          "food"
+        ]
       },
       {
         "name": "ПЕЧЕНЬЕ ПОСТНОЕ ЗЕРНОВ",
         "quantity": "0.466",
         "price": "439.99",
-        "sum": "205.04"
+        "sum": "205.04",
+        "categories": [
+          "food"
+        ]
       },
       {
         "name": "ХЛЕБ ЭНЕР ЗДОР СТРОЙН",
         "quantity": "1",
         "price": "62.99",
-        "sum": "62.99"
+        "sum": "62.99",
+        "categories": [
+          "food"
+        ]
       },
       {
         "name": "ОКОРОК ВЛИК К/В Н/К ВЕ",
         "quantity": "0.204",
         "price": "1119.99",
-        "sum": "228.48"
+        "sum": "228.48",
+        "categories": [
+          "household"
+        ]
       }
     ],
     "warnings": []

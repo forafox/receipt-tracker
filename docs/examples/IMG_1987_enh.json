@@ -3,17 +3,45 @@
     "store": "ООО \"Спар Нидл Волга\"",
     "datetime": "2025-11-06T21:06:00+03:00",
     "total": "694.70",
-    "items": [],
-    "warnings": [
-      "items_incomplete"
-    ]
+    "items": [
+      {
+        "name": "[М] 4902494110042 Напиток газированный ната RANUNE CO BKY",
+        "quantity": "1.000",
+        "price": "289.90",
+        "sum": "289.90",
+        "categories": [
+          "food"
+        ]
+      },
+      {
+        "name": "[М] 4607052401524 Сыр умалат сулгугни 45% 280г",
+        "quantity": "1.000",
+        "price": "359.90",
+        "sum": "359.90",
+        "categories": [
+          "food",
+          "personal_care"
+        ]
+      },
+      {
+        "name": "[М] 4603934000786 Вода питьевая святой источник негазиров",
+        "quantity": "1.000",
+        "price": "44.90",
+        "sum": "44.90",
+        "categories": [
+          "medicine",
+          "food"
+        ]
+      }
+    ],
+    "warnings": []
   },
   "match": {
     "store": false,
     "date": true,
     "total": true,
-    "item_sum_hits": 0,
-    "item_rows": 0
+    "item_sum_hits": 3,
+    "item_rows": 3
   },
   "target": {
     "store": "ООО \"Спар Миддл Волга\"",

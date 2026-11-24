@@ -8,13 +8,19 @@
         "name": "СЛИВКИ БОЛЬШ КРУЖКА У/",
         "quantity": "1",
         "price": "124.99",
-        "sum": "124.99"
+        "sum": "124.99",
+        "categories": [
+          "food"
+        ]
       },
       {
         "name": "ХЛЕБЕЦ ЭНЕР ЗДОР ПОД 3",
         "quantity": "1",
         "price": "89.99",
-        "sum": "89.99"
+        "sum": "89.99",
+        "categories": [
+          "food"
+        ]
       }
     ],
     "warnings": []

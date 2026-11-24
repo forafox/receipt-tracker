@@ -124,7 +124,18 @@ async def _run(model_path: Path, examples_path: Path, report_path: Path | None) 
             response = message.answer.await_args.args[0]
             if response == RU.error or response == RU.unreadable:
                 raise AssertionError(f"{example_id}: bot returned {response!r}")
-            photo_responses.append({"id": example_id, "response": response})
+            saved_receipt = next(
+                receipt
+                for receipt in storage.list_recent(707070, len(examples))
+                if receipt.datetime == expected.datetime and receipt.total == expected.total
+            )
+            photo_responses.append(
+                {
+                    "id": example_id,
+                    "response": response,
+                    "receipt": saved_receipt.model_dump(mode="json"),
+                }
+            )
 
         receipts = storage.list_recent(707070, len(examples))
         if len(receipts) != len(examples):
