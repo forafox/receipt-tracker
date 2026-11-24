@@ -8,9 +8,17 @@ from extract.layout import LayoutLine
 
 _QUANTITY_PATTERN = re.compile(
     rf"(?<![\w.,+\-−])(?P<quantity>\d+(?:[.,]\d+)?)\s*"
-    rf"(?:кг|kg|г|g|шт\.?|л|l)?\s*[xх×*]\s*"
+    rf"(?:кг|kg|г|g|шт\.?|л|l)?\s*[xх×*ж]\s*"
     rf"(?P<price>{_AMOUNT_PATTERN.pattern})(?:\s*=\s*|\s+)"
     rf"(?P<total>{_AMOUNT_PATTERN.pattern})$",
+    re.IGNORECASE,
+)
+_PRICE_QUANTITY_PATTERN = re.compile(
+    rf"(?<![\w.,+\-−])(?P<price>{_AMOUNT_PATTERN.pattern})\s*"
+    rf"[xх×*«»ж]\s*"
+    rf"(?P<quantity>\d+(?:[.,]\d+)?)\s*"
+    rf"(?:кг|kg|г|g|шт\.?|л|l)?\s*"
+    rf"(?:=\s*|\s+)(?P<total>{_AMOUNT_PATTERN.pattern})",
     re.IGNORECASE,
 )
 _NUMERIC_FRAGMENT = re.compile(r"[\d\s.,]+")
@@ -54,7 +62,7 @@ def _extract_layout_items(
         if pending and not _nearby(lines[pending[-1]], line):
             pending.clear()
         text = line.text.strip()
-        quantity_match = _QUANTITY_PATTERN.search(text)
+        quantity_match = _QUANTITY_PATTERN.search(text) or _PRICE_QUANTITY_PATTERN.search(text)
         if quantity_match is not None:
             name = text[: quantity_match.start()].strip()
             if name and not (_is_item_name(name) or _PERCENT_FRAGMENT.fullmatch(name)):

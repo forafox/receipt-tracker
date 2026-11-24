@@ -6,6 +6,7 @@ from common.ocr import OcrResult
 from extract._text import (
     _AMOUNT_PATTERN,
     _DATETIME_PATTERN,
+    _extract_bank_sum,
     _extract_total,
     _is_total_line,
 )
@@ -91,6 +92,8 @@ def _parse_receipt_fields(text: str, lines: list[str], timezone: tzinfo) -> Rece
     store = _extract_store(lines)
     receipt_datetime = _extract_datetime(text, timezone)
     total = _extract_total(lines)
+    if total is None:
+        total = _extract_bank_sum(lines)
 
     warnings: list[str] = []
     if store is None:
@@ -131,10 +134,15 @@ def _is_plausible_store_line(line: str) -> bool:
 def _extract_datetime(text: str, timezone: tzinfo) -> datetime | None:
     for match in _DATETIME_PATTERN.finditer(text):
         value = " ".join(match.group(1).split())
-        date_format = "%d.%m.%Y %H:%M:%S" if value.count(":") == 2 else "%d.%m.%Y %H:%M"
-        try:
-            parsed = datetime.strptime(value, date_format)
-        except ValueError:
-            continue
-        return parsed.replace(tzinfo=timezone)
+        for date_format in (
+            "%d.%m.%Y %H:%M:%S",
+            "%d.%m.%Y %H:%M",
+            "%d.%m.%y %H:%M:%S",
+            "%d.%m.%y %H:%M",
+        ):
+            try:
+                parsed = datetime.strptime(value, date_format)
+            except ValueError:
+                continue
+            return parsed.replace(tzinfo=timezone)
     return None

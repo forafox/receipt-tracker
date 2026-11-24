@@ -125,6 +125,63 @@ def test_explicit_quantity_and_weight_in_an_entire_row_block(
     assert parse_receipt(text, timezone=MOSCOW_TIMEZONE).items == []
 
 
+@pytest.mark.parametrize(
+    ("expression", "quantity", "price", "amount"),
+    [
+        ("5.49 * 2 = 10.98", "2", "5.49", "10.98"),
+        ("84.99 * 1.500 = 127.49", "1.500", "84.99", "127.49"),
+        ("0.00*3 0.00", "3", "0.00", "0.00"),
+        ("115.00 * 1шт. = 115.00", "1", "115.00", "115.00"),
+        ("140.00 ж 3 = 420.00", "3", "140.00", "420.00"),
+    ],
+)
+def test_price_times_quantity_rows_are_parsed(
+    expression: str, quantity: str, price: str, amount: str
+) -> None:
+    result = _result([_block(f"ТОВАР {expression} НДС 20%", 10, 60, 300)])
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [
+        Item(name="ТОВАР", quantity=Decimal(quantity), price=Decimal(price), sum=Decimal(amount))
+    ]
+
+
+def test_multiline_description_uses_price_times_quantity_row() -> None:
+    result = _result(
+        [
+            _block("картофель печёный", 10, 60, 160),
+            _block("115.00 * 1шт. = 115.00", 10, 80, 300),
+        ]
+    )
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [
+        Item(
+            name="картофель печёный",
+            quantity=Decimal("1"),
+            price=Decimal("115.00"),
+            sum=Decimal("115.00"),
+        )
+    ]
+
+
+def test_bank_sum_line_is_not_an_item() -> None:
+    result = _result(
+        [
+            _block("МОЛОКО", 10, 60),
+            _block("100.00", 210, 60, 60),
+            _block("Сумма (Руб): 2100.08", 10, 80, 220),
+        ],
+        total="2100.08",
+    )
+
+    receipt = parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+
+    assert receipt.items == [Item(name="МОЛОКО", sum=Decimal("100.00"))]
+
+
 @pytest.mark.parametrize("scale", [0.5, 3.0])
 def test_multiline_descriptions_and_quantity_rows_use_relative_geometry(scale: float) -> None:
     result = _result(
