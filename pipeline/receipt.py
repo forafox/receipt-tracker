@@ -1,14 +1,15 @@
 import asyncio
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, tzinfo
 from decimal import Decimal
 from functools import partial
 from itertools import count
 
-from common.contracts import Receipt
-from common.ocr import OcrEngine
+from common.contracts import Receipt, ReceiptWarning
+from common.ocr import OcrEngine, OcrResult
 from extract import parse_ocr_result
 from ocr import ImageDecodeError, ImageTooLargeError, OcrError
 from storage import ReceiptStorage
@@ -62,22 +63,67 @@ class MonthlySummary:
     total: Decimal
 
 
+def _score_receipt(receipt: Receipt, block_count: int) -> int:
+    warnings = {str(warning) for warning in receipt.warnings}
+    score = 0
+    if receipt.datetime is not None:
+        score += 1000
+    if receipt.total is not None:
+        score += 1000
+    if receipt.store is not None:
+        score += 50
+    score += min(len(receipt.items), 50) * 5
+    item_sum = sum((item.sum for item in receipt.items), Decimal(0))
+    if receipt.total is not None and receipt.items:
+        if item_sum == receipt.total:
+            score += 200
+        elif abs(item_sum - receipt.total) <= Decimal("0.01"):
+            score += 100
+    if ReceiptWarning.ITEMS_TOTAL_MISMATCH.value in warnings:
+        score -= 50
+    else:
+        score += 30
+    if ReceiptWarning.ITEMS_INCOMPLETE.value not in warnings:
+        score += 20
+    if ReceiptWarning.ITEM_AMOUNT_MISMATCH.value in warnings:
+        score -= 20
+    score += min(block_count, 200) // 20
+    return score
+
+
 class ReceiptPipeline:
     """Runs the receipt processing steps in order.
 
     A receipt rejected as a duplicate is kept in memory until the user decides whether to
     save it anyway. Only the latest such receipt per user is kept, and it is lost on restart.
+    When several recognizers are supplied, each result is parsed and the highest-scoring
+    receipt is saved.
     """
 
-    def __init__(self, recognizer: OcrEngine, storage: ReceiptStorage, timezone: tzinfo) -> None:
+    def __init__(
+        self,
+        recognizer: OcrEngine,
+        storage: ReceiptStorage,
+        timezone: tzinfo,
+        *,
+        recognizers: Sequence[OcrEngine] | None = None,
+    ) -> None:
         """Create a pipeline.
 
         Args:
-            recognizer: OCR step that returns text blocks with their positions.
+            recognizer: Primary OCR step, also used for the engine name in logs.
             storage: Storage for parsed receipts.
             timezone: Timezone of the local time printed on receipts and of month boundaries.
+            recognizers: Optional OCR candidates. When omitted, ``recognizer`` is the only one.
+
+        Raises:
+            ValueError: If an explicit empty recognizer sequence is supplied.
         """
         self._recognizer = recognizer
+        self._recognizers = tuple(recognizers) if recognizers is not None else (recognizer,)
+        if not self._recognizers:
+            msg = "at least one recognizer is required"
+            raise ValueError(msg)
         self._storage = storage
         self._timezone = timezone
         self._pending_duplicates: dict[int, tuple[int, Receipt, datetime]] = {}
@@ -101,9 +147,8 @@ class ReceiptPipeline:
             ReceiptImageTooLarge: If the photo exceeds the OCR size limits.
             RecognitionUnavailable: If the OCR engine itself failed.
         """
-        started = time.perf_counter()
         try:
-            blocks = await asyncio.to_thread(self._recognizer.recognize_blocks, photo)
+            blocks, receipt, ocr_seconds, parse_seconds = await self._read_receipt(photo)
         except ImageTooLargeError as error:
             raise ReceiptImageTooLarge from error
         except ImageDecodeError as error:
@@ -111,27 +156,25 @@ class ReceiptPipeline:
         except OcrError as error:
             logger.exception("OCR engine %s failed", self._recognizer.name)
             raise RecognitionUnavailable from error
-        recognized = time.perf_counter()
-        receipt = parse_ocr_result(blocks, timezone=self._timezone)
-        parsed = time.perf_counter()
         if receipt.datetime is None and receipt.total is None:
             logger.info(
                 "Unreadable receipt for user %s: ocr %.2fs, %d blocks",
                 user_id,
-                recognized - started,
+                ocr_seconds,
                 len(blocks.blocks),
             )
             raise ReceiptUnreadable
         purchased_at = receipt.datetime or received_at
+        save_started = time.perf_counter()
         saved = await asyncio.to_thread(self._storage.save, user_id, receipt, purchased_at)
-        finished = time.perf_counter()
+        save_seconds = time.perf_counter() - save_started
         logger.info(
             "Processed receipt for user %s: ocr %.2fs, parse %.2fs, save %.2fs, "
             "items %d, warnings %s, duplicate %s",
             user_id,
-            recognized - started,
-            parsed - recognized,
-            finished - parsed,
+            ocr_seconds,
+            parse_seconds,
+            save_seconds,
             len(receipt.items),
             receipt.warnings,
             not saved,
@@ -141,6 +184,45 @@ class ReceiptPipeline:
             self._pending_duplicates[user_id] = (pending_id, receipt, purchased_at)
             raise ReceiptAlreadySaved(pending_id)
         return receipt
+
+    async def _read_receipt(self, photo: bytes) -> tuple[OcrResult, Receipt, float, float]:
+        ocr_started = time.perf_counter()
+        results: list[OcrResult] = []
+        errors: list[Exception] = []
+        for recognizer in self._recognizers:
+            try:
+                results.append(await asyncio.to_thread(recognizer.recognize_blocks, photo))
+            except (ImageTooLargeError, ImageDecodeError):
+                raise
+            except OcrError as error:
+                errors.append(error)
+        ocr_finished = time.perf_counter()
+        if not results:
+            if errors:
+                raise errors[-1]
+            msg = "no OCR candidates were produced"
+            raise RecognitionUnavailable(msg)
+
+        candidates: list[tuple[OcrResult, Receipt]] = []
+        for result in results:
+            try:
+                receipt = parse_ocr_result(result, timezone=self._timezone)
+            except ValueError as error:
+                errors.append(error)
+                continue
+            candidates.append((result, receipt))
+        parse_finished = time.perf_counter()
+        if not candidates:
+            if errors:
+                raise errors[-1]
+            msg = "no OCR candidate could be parsed"
+            raise RecognitionUnavailable(msg)
+
+        best = max(
+            candidates,
+            key=lambda candidate: _score_receipt(candidate[1], len(candidate[0].blocks)),
+        )
+        return best[0], best[1], ocr_finished - ocr_started, parse_finished - ocr_finished
 
     async def save_duplicate(self, user_id: int, pending_id: int) -> Receipt | None:
         """Save a receipt rejected as a duplicate, after the user confirmed it.

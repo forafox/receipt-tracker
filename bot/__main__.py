@@ -9,7 +9,7 @@ from bot.config import BotSettings
 from bot.handlers import router
 from bot.middleware import LanguageMiddleware
 from bot.texts import DEFAULT_TEXTS, TEXTS_BY_LANGUAGE, Texts
-from ocr import build_default_ocr_service
+from ocr import OcrSettings, build_ocr_engines
 from pipeline import ReceiptPipeline
 from storage import SqliteReceiptStorage
 
@@ -47,7 +47,13 @@ async def main() -> None:
     settings = BotSettings()
     bot = Bot(token=settings.token.get_secret_value())
     storage = SqliteReceiptStorage(settings.database_path)
-    pipeline = ReceiptPipeline(build_default_ocr_service(), storage, ZoneInfo(settings.timezone))
+    recognizers = build_ocr_engines(OcrSettings())
+    pipeline = ReceiptPipeline(
+        recognizers[0],
+        storage,
+        ZoneInfo(settings.timezone),
+        recognizers=recognizers,
+    )
     dispatcher = Dispatcher(service=pipeline)
     dispatcher.message.middleware(LanguageMiddleware())
     dispatcher.callback_query.middleware(LanguageMiddleware())

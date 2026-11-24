@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from common.ocr import OcrEngine
 from ocr.core.config import OcrSettings
 from ocr.core.postprocess import PostprocessSettings
@@ -40,6 +42,37 @@ def build_ocr_engine(settings: OcrSettings | None = None) -> OcrEngine:
             postprocess=_postprocess_settings(resolved),
         )
     raise ValueError(f"Unknown OCR engine: {resolved.engine!r}")
+
+
+def build_ocr_engines(settings: OcrSettings | None = None) -> list[OcrEngine]:
+    """Build one engine for each adaptive Tesseract page-segmentation mode.
+
+    Only Tesseract supports adaptive mode selection; EasyOCR and a disabled adaptive
+    mode produce a single engine. The base Tesseract configuration is kept, except that
+    an existing ``--psm`` flag is replaced by each candidate mode.
+
+    Args:
+        settings: OCR settings; defaults to values loaded from the environment.
+
+    Returns:
+        Engines in candidate order. The list always contains at least one engine.
+    """
+    resolved = settings if settings is not None else OcrSettings()
+    if resolved.engine != "tesseract" or not resolved.adaptive:
+        return [build_ocr_engine(resolved)]
+    return [
+        build_ocr_engine(
+            resolved.model_copy(
+                update={"tesseract_config": _config_with_psm(resolved.tesseract_config, mode)}
+            )
+        )
+        for mode in resolved.adaptive_psm_modes
+    ]
+
+
+def _config_with_psm(config: str, psm: int) -> str:
+    without_psm = re.sub(r"--psm\s+\d+", "", config).strip()
+    return f"{without_psm} --psm {psm}".strip()
 
 
 def _quality_thresholds(settings: OcrSettings) -> QualityThresholds | None:

@@ -24,6 +24,35 @@ def test_quality_settings_are_enabled_with_conservative_defaults() -> None:
     assert settings.quality_max_glare_ratio == 0.35
 
 
+def test_adaptive_mode_is_disabled_with_safe_defaults() -> None:
+    settings = OcrSettings(_env_file=None)
+
+    assert settings.adaptive is False
+    assert settings.adaptive_psm_modes == [3, 4, 6]
+
+
+def test_adaptive_mode_is_loaded_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OCR_ADAPTIVE", "true")
+    monkeypatch.setenv("OCR_ADAPTIVE_PSM_MODES", "[4,6,4]")
+
+    settings = OcrSettings(_env_file=None)
+
+    assert settings.adaptive is True
+    assert settings.adaptive_psm_modes == [4, 6]
+
+
+@pytest.mark.parametrize("modes", ["[]", "[0]", "[14]"])
+def test_adaptive_mode_rejects_invalid_psm_modes(
+    monkeypatch: pytest.MonkeyPatch, modes: str
+) -> None:
+    monkeypatch.setenv("OCR_ADAPTIVE_PSM_MODES", modes)
+
+    with pytest.raises(ValidationError):
+        OcrSettings(_env_file=None)
+
+
 def test_quality_settings_are_loaded_from_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
