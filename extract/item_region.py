@@ -33,7 +33,7 @@ _ADJUSTMENT_PREFIXES = (
 _DATE_OR_TIME_PATTERN = re.compile(r"(?:\d{2}\.\d{2}\.\d{4}|\d{2}:\d{2}(?::\d{2})?)")
 _PARTIAL_DATETIME_PATTERN = re.compile(r"\d{2}\.\d{2}(?:\.\d{2})?[ \t]+\d{2}:\d{2}(?::\d{2})?")
 _SUMMARY_PATTERN = re.compile(
-    rf"(?:{'|'.join(_ADJUSTMENT_PREFIXES)}|ндс|сумма ндс|без ндс)"
+    rf"(?:{'|'.join(_ADJUSTMENT_PREFIXES)}|ндс|сумма ндс|без ндс|сумма\s*\(?\s*руб\.?\s*\)?)"
     r"(?:\s*[:=]?\s*[\d\s.,:%=+\-−]+(?:\s*руб\.?)?)?",
     re.IGNORECASE,
 )
