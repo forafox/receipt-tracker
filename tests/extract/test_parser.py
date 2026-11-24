@@ -95,6 +95,54 @@ def test_datetime_with_seconds_is_supported() -> None:
     assert receipt.datetime == datetime(2026, 10, 5, 15, 41, 27, tzinfo=MOSCOW_TIMEZONE)
 
 
+def test_two_digit_year_is_supported() -> None:
+    receipt = parse_receipt(
+        "ПЯТЁРОЧКА\nкассир 04.01.22 14:04\nИТОГ: 1399.37",
+        timezone=MOSCOW_TIMEZONE,
+    )
+
+    assert receipt.datetime == datetime(2022, 1, 4, 14, 4, tzinfo=MOSCOW_TIMEZONE)
+    assert receipt.total == Decimal("1399.37")
+
+
+def test_mid_line_total_label_is_supported() -> None:
+    receipt = parse_receipt(
+        "ПЯТЁРОЧКА\n04.01.2022 14:04\nОКРУГЛЕНИЕ: 0.00 ИТОГ: 1399.37",
+        timezone=MOSCOW_TIMEZONE,
+    )
+
+    assert receipt.total == Decimal("1399.37")
+
+
+def test_subtotal_label_is_not_a_total() -> None:
+    receipt = parse_receipt(
+        "ПЯТЁРОЧКА\n04.01.2022 14:04\nСКИДКА: 0.00 ПОДЫТОГ: 1399.37",
+        timezone=MOSCOW_TIMEZONE,
+    )
+
+    assert receipt.total is None
+
+
+def test_bank_sum_is_used_when_total_amount_is_missing() -> None:
+    receipt = parse_receipt(
+        "ПЯТЁРОЧКА\n04.01.2022 14:04\n"
+        "ОКРУГЛЕНИЕ: ИТОГ:\n"
+        "умна (Руб) : 1399.37, Комиссия за операцию 0 Руб",
+        timezone=MOSCOW_TIMEZONE,
+    )
+
+    assert receipt.total == Decimal("1399.37")
+
+
+def test_bank_sum_does_not_override_total_label() -> None:
+    receipt = parse_receipt(
+        "ПЯТЁРОЧКА\n04.01.2022 14:04\nИТОГО 100.00\nСумма (Руб): 200.00",
+        timezone=MOSCOW_TIMEZONE,
+    )
+
+    assert receipt.total == Decimal("100.00")
+
+
 def test_invalid_datetime_does_not_crash_parsing() -> None:
     receipt = parse_receipt(
         "ЛЕНТА\n35.15.2026 25:90\nИТОГО 10,00",

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from common.ocr import OcrResult, TextBlock
 from ocr.core.geometry import Box, axis_aligned
 
@@ -18,7 +20,23 @@ def blocks_to_text(result: OcrResult, *, line_overlap: float = 0.5) -> str:
     Returns:
         Recognized text with one line per assembled line of the receipt.
     """
-    rects = [(block, axis_aligned(block.bbox)) for block in result.blocks]
+    lines = group_blocks_into_lines(result.blocks, line_overlap=line_overlap)
+    return "\n".join(" ".join(block.text for block in line) for line in lines)
+
+
+def group_blocks_into_lines(
+    blocks: Sequence[TextBlock], *, line_overlap: float = 0.5
+) -> list[list[TextBlock]]:
+    """Group blocks into lines ordered top to bottom and left to right.
+
+    Args:
+        blocks: Recognized text fragments with their bounding boxes.
+        line_overlap: Minimum vertical overlap ratio for two blocks to share a line.
+
+    Returns:
+        Lines of blocks in reading order; each line is ordered left to right.
+    """
+    rects = [(block, axis_aligned(block.bbox)) for block in blocks]
     lines: list[list[tuple[TextBlock, Box]]] = []
     for block, rect in sorted(rects, key=lambda item: (item[1][1], item[1][0])):
         line = _matching_line(lines, rect, line_overlap)
@@ -28,10 +46,7 @@ def blocks_to_text(result: OcrResult, *, line_overlap: float = 0.5) -> str:
             line.append((block, rect))
 
     ordered = sorted(lines, key=lambda line: min(rect[1] for _, rect in line))
-    return "\n".join(
-        " ".join(block.text for block, _ in sorted(line, key=lambda item: item[1][0]))
-        for line in ordered
-    )
+    return [[block for block, _ in sorted(line, key=lambda item: item[1][0])] for line in ordered]
 
 
 def _matching_line(

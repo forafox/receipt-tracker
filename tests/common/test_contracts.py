@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from common.contracts import Item, Receipt
+from common.contracts import Item, Receipt, ReceiptWarning
 
 
 def test_item_and_receipt_accept_complete_data() -> None:
@@ -96,3 +96,24 @@ def test_receipt_json_round_trip() -> None:
     restored = Receipt.model_validate_json(serialized)
 
     assert restored == receipt
+
+
+def test_receipt_warning_values_are_stable() -> None:
+    # Saved receipts keep these strings, so changing a value breaks stored data.
+    assert {warning.value for warning in ReceiptWarning} == {
+        "store_not_found",
+        "datetime_not_found",
+        "total_not_found",
+        "items_incomplete",
+        "item_amount_mismatch",
+        "items_total_mismatch",
+    }
+
+
+def test_receipt_warning_survives_json_round_trip() -> None:
+    receipt = Receipt(warnings=[ReceiptWarning.ITEMS_INCOMPLETE])
+
+    restored = Receipt.model_validate_json(receipt.model_dump_json())
+
+    assert restored.warnings == ["items_incomplete"]
+    assert ReceiptWarning.ITEMS_INCOMPLETE in restored.warnings

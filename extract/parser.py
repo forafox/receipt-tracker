@@ -1,11 +1,12 @@
 import re
 from datetime import datetime, tzinfo
 
-from common.contracts import Receipt
+from common.contracts import Receipt, ReceiptWarning
 from common.ocr import OcrResult
 from extract._text import (
     _AMOUNT_PATTERN,
     _DATETIME_PATTERN,
+    _extract_bank_sum,
     _extract_total,
     _is_total_line,
 )
@@ -20,10 +21,10 @@ from extract.layout import reconstruct_layout
 from extract.layout_items import _extract_layout_items
 from extract.validation import _validate_arithmetic
 
-STORE_NOT_FOUND = "store_not_found"
-DATETIME_NOT_FOUND = "datetime_not_found"
-TOTAL_NOT_FOUND = "total_not_found"
-ITEMS_INCOMPLETE = "items_incomplete"
+STORE_NOT_FOUND = ReceiptWarning.STORE_NOT_FOUND
+DATETIME_NOT_FOUND = ReceiptWarning.DATETIME_NOT_FOUND
+TOTAL_NOT_FOUND = ReceiptWarning.TOTAL_NOT_FOUND
+ITEMS_INCOMPLETE = ReceiptWarning.ITEMS_INCOMPLETE
 
 _NUMBER_ONLY_PATTERN = re.compile(r"[\d\s.,:+\-№#]+")
 
@@ -91,6 +92,8 @@ def _parse_receipt_fields(text: str, lines: list[str], timezone: tzinfo) -> Rece
     store = _extract_store(lines)
     receipt_datetime = _extract_datetime(text, timezone)
     total = _extract_total(lines)
+    if total is None:
+        total = _extract_bank_sum(lines)
 
     warnings: list[str] = []
     if store is None:
@@ -131,10 +134,15 @@ def _is_plausible_store_line(line: str) -> bool:
 def _extract_datetime(text: str, timezone: tzinfo) -> datetime | None:
     for match in _DATETIME_PATTERN.finditer(text):
         value = " ".join(match.group(1).split())
-        date_format = "%d.%m.%Y %H:%M:%S" if value.count(":") == 2 else "%d.%m.%Y %H:%M"
-        try:
-            parsed = datetime.strptime(value, date_format)
-        except ValueError:
-            continue
-        return parsed.replace(tzinfo=timezone)
+        for date_format in (
+            "%d.%m.%Y %H:%M:%S",
+            "%d.%m.%Y %H:%M",
+            "%d.%m.%y %H:%M:%S",
+            "%d.%m.%y %H:%M",
+        ):
+            try:
+                parsed = datetime.strptime(value, date_format)
+            except ValueError:
+                continue
+            return parsed.replace(tzinfo=timezone)
     return None

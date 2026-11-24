@@ -1,13 +1,7 @@
 from dataclasses import dataclass
 
-from common.contracts import Receipt
+from common.contracts import Receipt, ReceiptWarning
 from pipeline import MonthlySummary
-
-# Warnings added by the extraction module.
-# Item sums do not add up to the total.
-ITEMS_TOTAL_MISMATCH = "items_total_mismatch"
-# Some lines looked like items but could not be parsed.
-ITEMS_INCOMPLETE = "items_incomplete"
 
 
 @dataclass(frozen=True)
@@ -210,9 +204,9 @@ def format_receipt(receipt: Receipt, texts: Texts) -> str:
     if receipt.items:
         lines.append(f"\n{texts.items}:")
         lines.extend(f"- {item.name}: {item.sum:.2f}" for item in receipt.items)
-    if ITEMS_INCOMPLETE in receipt.warnings:
+    if ReceiptWarning.ITEMS_INCOMPLETE in receipt.warnings:
         lines.append(f"\n{texts.items_incomplete}")
-    if ITEMS_TOTAL_MISMATCH in receipt.warnings:
+    if ReceiptWarning.ITEMS_TOTAL_MISMATCH in receipt.warnings:
         lines.append(f"\n{texts.items_mismatch}")
     return "\n".join(lines)
 

@@ -87,9 +87,7 @@ def test_ambiguous_header_keeps_store_unknown(ocr: bool) -> None:
 
 
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
-@pytest.mark.parametrize(
-    "date_line", ["05.10 18:20", "Дата: 05.10.2026", "Дата: 05.10 18:20", "05.10.26 18:20"]
-)
+@pytest.mark.parametrize("date_line", ["05.10 18:20", "Дата: 05.10.2026", "Дата: 05.10 18:20"])
 def test_incomplete_date_is_not_completed_from_current_time(ocr: bool, date_line: str) -> None:
     text = f"МАГАЗИН\n{date_line}\nХЛЕБ 50.00\nИТОГО 50.00"
     result = _make_ocr(
@@ -112,6 +110,24 @@ def test_incomplete_date_is_not_completed_from_current_time(ocr: bool, date_line
         items=[Item(name="ХЛЕБ", sum=Decimal("50.00"))],
         warnings=["datetime_not_found"],
     )
+
+
+@pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
+def test_two_digit_year_and_mid_line_total_are_supported(ocr: bool) -> None:
+    text = "МАГАЗИН\nкассир 04.01.22 14:04\nОКРУГЛЕНИЕ: 0.00 ИТОГ: 1399.37"
+    result = _make_ocr(
+        ("МАГАЗИН", 10, 10, 110),
+        ("кассир 04.01.22 14:04", 10, 30, 260),
+        ("ОКРУГЛЕНИЕ: 0.00 ИТОГ: 1399.37", 10, 60, 335),
+    )
+    actual = (
+        parse_ocr_result(result, timezone=MOSCOW_TIMEZONE)
+        if ocr
+        else parse_receipt(text, timezone=MOSCOW_TIMEZONE)
+    )
+
+    assert actual.datetime == datetime(2022, 1, 4, 14, 4, tzinfo=MOSCOW_TIMEZONE)
+    assert actual.total == Decimal("1399.37")
 
 
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
