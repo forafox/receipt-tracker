@@ -1,31 +1,33 @@
-# E2E: ten real receipts
+# E2E: regex on main vs Ollama fallback
 
 Run date: 2026-11-24. Dataset: `cdek-ocr/receipt-ocr-ru`, `test` split. The run
 used the first ten rows among the first thirty with a numeric annotated total and
-date. Each image passed through Tesseract M1, deterministic M2 plus the Ollama
-repair fallback, the existing M3 classifier, and the Ollama category check.
+date. Each photo was recognized once by Tesseract; those same OCR blocks were
+parsed by the regex version from updated `main` and by regex plus the local Ollama
+fallback. The existing M3 classifier and Ollama validator ran on fallback items.
 
 ## Results
 
 | Measure | Result |
 |---|---:|
-| Store name exact/normalized match | 3/10 |
-| Receipt date match | 2/10 |
-| Total match | 3/10 |
+| Store name exact/normalized match | regex 0/10 → fallback 2/10 |
+| Receipt date match | regex 2/10 → fallback 2/10 |
+| Total match | regex 2/10 → fallback 3/10 |
 | Annotated item rows | 43 |
-| Item rows extracted by regex parser | 8 |
-| Item rows extracted with Ollama fallback | 17 |
-| Extracted sums matching any annotated item sum | 8/17 |
+| Item rows extracted | regex 8 → fallback 17 |
+| Extracted sums matching any annotated item sum | regex 2/8 → fallback 8/17 |
+| Receipts with at least one warning | regex 10/10 → fallback 10/10 |
 | M3 outputs rechecked by Ollama | 17 |
-| M3 checks: agreed / disagreed / uncertain | 9 / 6 / 2 |
+| M3 checks: agreed / disagreed / uncertain | 9 / 7 / 1 |
 
-Compared with the regex-only parse, the accepted Ollama fallback raised store
-matches from 0 to 3, total matches from 2 to 3, and extracted item rows from 8 to
-17. Date matches stayed at 2. The fallback still missed most of the 43 annotated
-items, and only 8 of its 17 amounts matched any annotated item sum. It also
-retained arithmetic warnings where evidence did not reconcile. `IMG_2026_enh`
-has ten annotated items; the fallback found three, while retaining its correct
-date and total.
+The local fallback improves store and total matches slightly and more than
+doubles the number of extracted item rows. Date accuracy is unchanged. It still
+misses most of the 43 annotated rows; 8 of its 17 extracted sums match any
+annotated sum, and every receipt retains at least one warning. Some accepted
+item rows are false positives or have sums that do not reconcile. `IMG_2026_enh`
+has ten annotated items; regex finds three rows, and the fallback also finds
+three. The fallback adds the correct store while retaining the correct date and
+total, but reports an arithmetic mismatch.
 
 The dataset has no product-category annotations, so M3 category accuracy cannot
 be measured on these rows. On the 17 extracted rows Ollama agreed with nine M3
@@ -35,10 +37,11 @@ reported separately. Agreement is not proof of correctness.
 
 ## Example
 
-On `IMG_2026_enh`, OCR found `10000702652 CYMMA (РУБ.); 1678.38`. M2 returned
-store `ЛЕНТА`, date `2025-11-05`, total `1678.38`, and three item rows (the
-annotation has ten). For `САРДЕЛЬКИ N3 ПОМОНОСОВ`, M3 selected `household` and
-the local check suggested `food`:
+On `IMG_2026_enh`, OCR found `10000702652 CYMMA (РУБ.); 1678.38`. Regex returns
+date `2025-11-05`, total `1678.38`, but no store. The fallback adds store
+`ЛЕНТА`; it still extracts only three of ten annotated items. For
+`САРДЕЛЬКИ N3 ПОМОНОСОВ`, M3 selected `household` and the local check suggested
+`food`:
 
 ```json
 {
@@ -65,5 +68,6 @@ PYTHONPATH=. python scripts/e2e_10_receipts.py
 ```
 
 If Tesseract is outside `PATH`, set `TESSERACT_CMD`. The script fetches images and
-annotations from the Hugging Face dataset server and writes full outputs to
+annotations from the Hugging Face dataset server, caches images in
+`/tmp/receipt-e2e10-images`, and writes full outputs to
 `/tmp/receipt-e2e10-results.json` by default.
