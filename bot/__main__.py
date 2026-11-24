@@ -3,6 +3,7 @@ import logging
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.types import BotCommand
 
 from bot.config import BotSettings
@@ -45,7 +46,8 @@ async def set_commands(bot: Bot) -> None:
 async def main() -> None:
     """Configure and start the Telegram bot polling loop."""
     settings = BotSettings()
-    bot = Bot(token=settings.token.get_secret_value())
+    session = AiohttpSession(proxy=settings.api_proxy)
+    bot = Bot(token=settings.token.get_secret_value(), session=session)
     storage = SqliteReceiptStorage(settings.database_path)
     recognizers = build_ocr_engines(OcrSettings())
     pipeline = ReceiptPipeline(

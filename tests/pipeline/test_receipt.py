@@ -154,6 +154,43 @@ async def test_adaptive_pipeline_selects_best_parsed_candidate() -> None:
     assert storage.saved == [(1, receipt, datetime(2026, 10, 5, 18, 20, tzinfo=MOSCOW_TIMEZONE))]
 
 
+async def test_hunyuan_candidate_is_absolute_priority_when_parseable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from extract.parser import parse_ocr_result
+
+    monkeypatch.setattr(
+        "pipeline.receipt.parse_with_agent",
+        lambda result, *, timezone: parse_ocr_result(result, timezone=timezone),
+    )
+    hunyuan = FakeRecognizer("05.10.2026 18:20\nМОЛОКО 100.00\nИТОГО 100.00")
+    hunyuan.name = "hunyuan_ocr"
+    regex = FakeRecognizer(
+        "ПЯТЁРОЧКА\n05.10.2026 18:20\nМОЛОКО 40.00\nХЛЕБ 60.00\nИТОГО 100.00"
+    )
+    pipeline = ReceiptPipeline(regex, FakeStorage(), MOSCOW_TIMEZONE, recognizers=[hunyuan, regex])
+
+    _, receipt, _, _ = await pipeline._read_receipt(b"image")
+
+    assert receipt.store is None
+    assert receipt.items == [Item(name="МОЛОКО", sum=Decimal("100.00"))]
+    assert regex.received is None
+
+
+async def test_regex_candidate_is_used_when_hunyuan_endpoint_is_unavailable() -> None:
+    hunyuan = FailingRecognizer(OcrEngineUnavailableError("connection refused"))
+    hunyuan.name = "hunyuan_ocr"
+    regex = FakeRecognizer(
+        "ПЯТЁРОЧКА\n05.10.2026 18:20\nМОЛОКО 100.00\nИТОГО 100.00"
+    )
+    pipeline = ReceiptPipeline(regex, FakeStorage(), MOSCOW_TIMEZONE, recognizers=[hunyuan, regex])
+
+    _, receipt, _, _ = await pipeline._read_receipt(b"image")
+
+    assert receipt.store == "ПЯТЁРОЧКА"
+    assert regex.received == b"image"
+
+
 async def test_receipt_without_date_is_saved_at_receive_time() -> None:
     storage = FakeStorage()
 

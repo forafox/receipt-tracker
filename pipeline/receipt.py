@@ -96,8 +96,8 @@ class ReceiptPipeline:
 
     A receipt rejected as a duplicate is kept in memory until the user decides whether to
     save it anyway. Only the latest such receipt per user is kept, and it is lost on restart.
-    When several recognizers are supplied, each result is parsed and the highest-scoring
-    receipt is saved.
+    A parseable Hunyuan result is absolute priority. Other recognizers run only when
+    Hunyuan fails; without Hunyuan, the highest-scoring parsed OCR result is saved.
     """
 
     def __init__(
@@ -186,25 +186,22 @@ class ReceiptPipeline:
         return receipt
 
     async def _read_receipt(self, photo: bytes) -> tuple[OcrResult, Receipt, float, float]:
-        ocr_started = time.perf_counter()
-        results: list[OcrResult] = []
+        ocr_seconds = 0.0
+        parse_seconds = 0.0
         errors: list[Exception] = []
+        candidates: list[tuple[OcrEngine, OcrResult, Receipt]] = []
         for recognizer in self._recognizers:
+            ocr_started = time.perf_counter()
             try:
-                results.append(await asyncio.to_thread(recognizer.recognize_blocks, photo))
+                result = await asyncio.to_thread(recognizer.recognize_blocks, photo)
             except (ImageTooLargeError, ImageDecodeError):
                 raise
             except OcrError as error:
                 errors.append(error)
-        ocr_finished = time.perf_counter()
-        if not results:
-            if errors:
-                raise errors[-1]
-            msg = "no OCR candidates were produced"
-            raise RecognitionUnavailable(msg)
+                continue
+            ocr_seconds += time.perf_counter() - ocr_started
 
-        candidates: list[tuple[OcrResult, Receipt]] = []
-        for result in results:
+            parse_started = time.perf_counter()
             try:
                 receipt = await asyncio.to_thread(
                     parse_with_agent, result, timezone=self._timezone
@@ -212,19 +209,28 @@ class ReceiptPipeline:
             except ValueError as error:
                 errors.append(error)
                 continue
-            candidates.append((result, receipt))
-        parse_finished = time.perf_counter()
+            parse_seconds += time.perf_counter() - parse_started
+            candidates.append((recognizer, result, receipt))
+            # Hunyuan is the primary recognizer. Once its text can be parsed, keep
+            # its result without waiting for or comparing lower-priority OCR engines.
+            if recognizer.name == "hunyuan_ocr":
+                break
+
         if not candidates:
             if errors:
                 raise errors[-1]
             msg = "no OCR candidate could be parsed"
             raise RecognitionUnavailable(msg)
 
-        best = max(
-            candidates,
-            key=lambda candidate: _score_receipt(candidate[1], len(candidate[0].blocks)),
+        hunyuan = next(
+            (candidate for candidate in candidates if candidate[0].name == "hunyuan_ocr"),
+            None,
         )
-        return best[0], best[1], ocr_finished - ocr_started, parse_finished - ocr_finished
+        best = hunyuan or max(
+            candidates,
+            key=lambda candidate: _score_receipt(candidate[2], len(candidate[1].blocks)),
+        )
+        return best[1], best[2], ocr_seconds, parse_seconds
 
     async def save_duplicate(self, user_id: int, pending_id: int) -> Receipt | None:
         """Save a receipt rejected as a duplicate, after the user confirmed it.

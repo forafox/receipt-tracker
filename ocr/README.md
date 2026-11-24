@@ -59,12 +59,13 @@ ocr/
 
 ## Движки OCR
 
-Реализованы два взаимозаменяемых движка за общим контрактом из `common/ocr.py`:
+Движки реализуют общий контракт из `common/ocr.py`:
 
 | Движок | Класс | Зависимости |
 |---|---|---|
 | Tesseract | `ocr.engines.tesseract.TesseractEngine` | `pytesseract` + бинарь `tesseract` |
 | EasyOCR | `ocr.engines.easyocr.EasyOcrEngine` | `easyocr` (первый запуск скачивает веса) |
+| HunyuanOCR | `ocr.engines.hunyuan_vision.HunyuanVisionEngine` | локальный `llama.cpp` HTTP-сервер; приоритетный кандидат |
 
 Контракт:
 
@@ -76,7 +77,18 @@ ocr/
 
 Выбор движка — через конфиг (`ocr.core.config.OcrSettings`, переменные окружения с префиксом `OCR_`):
 `OCR_ENGINE`, `OCR_TESSERACT_LANGUAGES`, `OCR_EASYOCR_LANGUAGES`, `OCR_MIN_CONFIDENCE`, `OCR_GPU`,
-`OCR_TESSERACT_CONFIG`.
+`OCR_TESSERACT_CONFIG`, `OCR_HUNYUAN_OCR_ENABLED`, `OCR_HUNYUAN_OCR_MODEL`,
+`OCR_HUNYUAN_OCR_URL` и `OCR_HUNYUAN_OCR_TIMEOUT_SECONDS`.
+
+HunyuanOCR включён по умолчанию. Когда endpoint доступен, Hunyuan становится абсолютным первым
+выбором: любой ответ, который M2 смог
+разобрать, используется без сравнения с другими OCR-движками. Tesseract/EasyOCR запускаются только
+если Hunyuan недоступен или M2 не смог разобрать его ответ.
+Модель возвращает полный построчный текст; адаптер сохраняет порядок и передаёт строки в M2 как
+`OcrResult` с приблизительными полноширинными координатами. На оценочном русском чеке это дало
+обе товарные позиции, которые модель Qwen2.5-VL-3B в том же сравнении пропустила. Из-за настоящих
+координат в plain-text режиме нет: прямой JSON-режим координат на этом фото оказался неполным.
+Подробности запуска и ограничения приведены в `docs/hunyuanocr_evaluation.md`.
 
 ### Проверка качества изображения
 

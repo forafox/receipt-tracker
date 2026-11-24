@@ -22,6 +22,10 @@ class OcrSettings(BaseSettings):
         postprocess_enabled: Whether to filter tiny and overlapping blocks and sort them.
         postprocess_min_box_area: Minimum axis-aligned box area in pixels to keep a block.
         postprocess_nms_iou: Maximum IoU with a stronger block before a block is suppressed.
+        hunyuan_ocr_enabled: Whether to add the local HunyuanOCR VLM as an OCR candidate.
+        hunyuan_ocr_model: Model alias exposed by the local llama.cpp server.
+        hunyuan_ocr_url: OpenAI-compatible llama.cpp chat-completions endpoint.
+        hunyuan_ocr_timeout_seconds: Timeout for one vision OCR request.
     """
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="OCR_", extra="ignore")
@@ -41,6 +45,10 @@ class OcrSettings(BaseSettings):
     postprocess_enabled: bool = True
     postprocess_min_box_area: float = Field(default=9.0, ge=0)
     postprocess_nms_iou: float = Field(default=0.5, gt=0, le=1)
+    hunyuan_ocr_enabled: bool = True
+    hunyuan_ocr_model: str = "HunyuanOCR"
+    hunyuan_ocr_url: str = "http://localhost:8231/v1/chat/completions"
+    hunyuan_ocr_timeout_seconds: float = Field(default=600.0, gt=0)
 
     @field_validator("adaptive_psm_modes")
     @classmethod

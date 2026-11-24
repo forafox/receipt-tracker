@@ -12,7 +12,7 @@ from extract._text import (
     _is_total_line,
     _parse_decimal,
 )
-from extract.layout import LayoutLine, _has_usable_geometry, _nearby
+from extract.layout import LayoutLine, _has_usable_geometry
 
 _NUMBERED_SERVICE_PREFIXES = ("касса", "смена", "чек")
 _HEADER_PREFIXES = (
@@ -21,10 +21,32 @@ _HEADER_PREFIXES = (
     "место расчетов",
     "место расчётов",
     "кассовый чек",
+    "документ на продажу",
     "рн ккт",
 )
-_PAYMENT_PREFIXES = ("картой", "наличными", "сдача", "безналичными", "безналичный расчет")
-_FOOTER_PREFIXES = ("спасибо за покупку", "сайт фнс", "www.nalog.ru")
+_PAYMENT_PREFIXES = (
+    "банковские оплаты",
+    "банковская оплата",
+    "система быстрых платежей",
+    "bankorpaymententity",
+    "оплата картой",
+    "платеж картой",
+    "платёж картой",
+    "картой",
+    "наличными",
+    "сдача",
+    "безналичными",
+    "безналичный расчет",
+    "итого к оплате",
+    "итого",
+    "позиции",
+)
+_FOOTER_PREFIXES = (
+    "bankorpaymententity",
+    "спасибо за покупку",
+    "сайт фнс",
+    "www.nalog.ru",
+)
 _ADJUSTMENT_PREFIXES = (
     "скидка",
     "сумма скидки",
@@ -37,12 +59,31 @@ _ADJUSTMENT_PREFIXES = (
 )
 _DATE_OR_TIME_PATTERN = re.compile(r"(?:\d{2}\.\d{2}\.\d{4}|\d{2}:\d{2}(?::\d{2})?)")
 _PARTIAL_DATETIME_PATTERN = re.compile(r"\d{2}\.\d{2}(?:\.\d{2})?[ \t]+\d{2}:\d{2}(?::\d{2})?")
+_ADDRESS_LINE_PATTERN = re.compile(
+    r"^(?:россия\b|(?:г|город|ул|улица|просп|проспект|пер|переулок|дом|д)\.?\s)",
+    re.IGNORECASE,
+)
 _SUMMARY_PATTERN = re.compile(
-    rf"(?:{'|'.join(_ADJUSTMENT_PREFIXES)}|ндс|сумма ндс|без ндс|сумма\s*\(?\s*руб\.?\s*\)?"
+    rf"(?:{'|'.join(_ADJUSTMENT_PREFIXES)}|ндс|нас|сумма ндс|сумма нас|без ндс"
+    r"|сумма\s*\(?\s*руб\.?\s*\)?"
     r"|(?:(?:налог|[^\W\d_])\s+)?на\s+добавленную\s+стои[а-я]ость\s+\d+(?:[.,]\d+)?\s*%"
     r"|(?:начислено|потрачено|всего)\s+баллов)"
     r"(?:\s*[:=]?\s*[\d\s.,:/%=+\-−]+(?:\s*руб\.?)?)?",
     re.IGNORECASE,
+)
+_TABLE_TAX_PATTERN = re.compile(r"^(?:ндс|нас|сумма\s+ндс)\b", re.IGNORECASE)
+_OCR_TOTAL_HEADING_PATTERN = re.compile(
+    r"^#+\s*(?:итог(?:о)?|сумма\s+без\s+ндс)\s*$", re.IGNORECASE
+)
+_BONUS_PATTERN = re.compile(
+    r"^(?:баланс\s+(?:баллов|фишек)|баллов\s+к\s+сгоранию|начислено\s+фишек)\b", re.IGNORECASE
+)
+_ITEM_AMOUNT_PATTERN = re.compile(
+    rf"\d+(?:[.,]\d+)?\s*\*\s*\d+(?:[.,]\d+)?\s*(?:шт\.?\s*)?=\s*{_AMOUNT_PATTERN.pattern}",
+    re.IGNORECASE,
+)
+_TAX_CLASSIFICATION_PATTERN = re.compile(
+    r"^н[дaа]с\s+(?:не\s+облагается|\d+(?:[.,]\d+)?\s*%)", re.IGNORECASE
 )
 
 
@@ -58,29 +99,80 @@ class _TotalBoundary:
 def _find_layout_totals(lines: list[LayoutLine]) -> tuple[_TotalBoundary, ...]:
     totals = []
     for index, line in enumerate(lines):
-        amount = _extract_total([text.strip() for text in line.text.splitlines() if text.strip()])
+        normalized = _normalize_table_text(line.text)
+        cells = [cell.strip() for cell in line.text.strip().strip("|").split("|")]
+        amount = _extract_total([normalized])
+        heading = line.text.strip().lstrip("# ").strip()
+        if amount is None and _TOTAL_LABEL_PATTERN.search(heading) is not None:
+            for following_index in range(index + 1, len(lines)):
+                following = lines[following_index]
+                value = following.text.strip().removeprefix("=").strip()
+                if _AMOUNT_PATTERN.fullmatch(value):
+                    amount = _parse_decimal(value)
+                    break
+                if _DATETIME_PATTERN.search(following.text):
+                    break
+        if amount is None and len(cells) > 1:
+            total_label = next(
+                (
+                    cell
+                    for cell in cells
+                    if _TOTAL_LABEL_PATTERN.fullmatch(cell.strip()) is not None
+                ),
+                None,
+            )
+            amount_cell = next(
+                (
+                    cell
+                    for cell in reversed(cells)
+                    if _AMOUNT_PATTERN.fullmatch(cell.removeprefix("=").strip())
+                ),
+                None,
+            )
+            if total_label is not None and amount_cell is not None:
+                amount = _parse_decimal(amount_cell.removeprefix("=").strip())
         if amount is not None:
             totals.append(_TotalBoundary(index, index, amount))
             continue
-        label = line.text.strip().rstrip(":=").strip()
-        if _TOTAL_LABEL_PATTERN.fullmatch(label) is None or index + 1 >= len(lines):
+        label = cells[0].rstrip(":=").strip() if len(cells) > 1 else normalized.rstrip(":=").strip()
+        table_total_heading = (
+            len(cells) > 1
+            and _TOTAL_LABEL_PATTERN.search(cells[0].lstrip("# ").strip()) is not None
+        )
+        plain_total_heading = _TOTAL_LABEL_PATTERN.search(label.lstrip("# ").strip()) is not None
+        if not plain_total_heading and not table_total_heading:
+            # Some receipt tables place the amount in the final cell after OCR
+            # inserts an unlabelled or corrupted middle cell.
+            if _TOTAL_LABEL_PATTERN.search(label) is not None:
+                amount_cell = next(
+                    (
+                        cell
+                        for cell in reversed(cells[1:])
+                        if _AMOUNT_PATTERN.fullmatch(cell.removeprefix("=").strip())
+                    ),
+                    None,
+                )
+                if amount_cell is not None:
+                    totals.append(
+                        _TotalBoundary(
+                            index, index, _parse_decimal(amount_cell.removeprefix("=").strip())
+                        )
+                    )
+            continue
+        if index + 1 >= len(lines):
             continue
         if not _has_usable_geometry(line):
             continue
         candidates = []
         for following_index in range(index + 1, len(lines)):
             following = lines[following_index]
-            if following.y_min - line.y_max > line.y_max - line.y_min:
+            if following.y_min - line.y_max > 8 * (line.y_max - line.y_min):
                 break
             value = following.text.strip().removeprefix("=").strip()
-            if (
-                _AMOUNT_PATTERN.fullmatch(value)
-                and _has_usable_geometry(following)
-                and _nearby(line, following)
-                and following.x_min >= line.x_min
-            ):
+            if _AMOUNT_PATTERN.fullmatch(value) and _has_usable_geometry(following):
                 candidates.append(_TotalBoundary(index, following_index, _parse_decimal(value)))
-        if len(candidates) == 1 and candidates[0].amount_index == index + 1:
+                break
+        if candidates:
             totals.extend(candidates)
     return tuple(totals)
 
@@ -109,7 +201,7 @@ def _select_item_candidate_indices(
     cleaned_lines = [(index, line.strip()) for index, line in enumerate(lines) if line.strip()]
     region_end = len(cleaned_lines)
     if totals:
-        region_end = sum(index < totals[-1].label_index for index, _ in cleaned_lines)
+        region_end = sum(index <= totals[-1].label_index for index, _ in cleaned_lines)
     else:
         for index in range(len(cleaned_lines) - 1, -1, -1):
             _, line = cleaned_lines[index]
@@ -129,10 +221,29 @@ def _select_item_candidate_indices(
             continue
         if any(_has_service_prefix(folded_line, prefix) for prefix in _PAYMENT_PREFIXES):
             break
+        if _TOTAL_LABEL_PATTERN.search(line) is not None and not _ITEM_AMOUNT_PATTERN.search(line):
+            break
         if _is_metadata_line(line) or not any(character.isalnum() for character in line):
             continue
+        normalized = _normalize_table_text(line)
+        if (
+            _TABLE_TAX_PATTERN.match(normalized)
+            or _TAX_CLASSIFICATION_PATTERN.match(normalized)
+            or _BONUS_PATTERN.match(normalized)
+            or normalized.startswith("#")
+        ):
+            continue
+        if normalized.casefold() in {"товар", "кассир"}:
+            continue
         candidates.append(index)
-    return candidates
+    unique: list[int] = []
+    seen: set[str] = set()
+    for index in candidates:
+        normalized = _normalize_table_text(lines[index]).casefold()
+        if normalized not in seen:
+            seen.add(normalized)
+            unique.append(index)
+    return unique
 
 
 def _has_unresolved_item_candidates(
@@ -199,7 +310,25 @@ def _can_reconcile_item_region(
 
 
 def _is_metadata_line(line: str) -> bool:
+    if _OCR_TOTAL_HEADING_PATTERN.fullmatch(line.strip()):
+        return True
+    if "|" in line:
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|") if cell.strip()]
+        if len(cells) > 1 and all(set(cell) <= {"-", "—", ":"} for cell in cells):
+            return True
+        if cells and _TOTAL_LABEL_PATTERN.search(cells[0].lstrip("# ").strip()) is not None:
+            return True
+        if (
+            cells
+            and _is_total_line(cells[0])
+            and any(_AMOUNT_PATTERN.search(cell) for cell in cells[1:])
+        ):
+            return True
     folded_line = line.casefold()
+    if _ADDRESS_LINE_PATTERN.search(line.strip()):
+        return True
+    if _BONUS_PATTERN.match(line.strip().strip("#|").strip()):
+        return True
     if folded_line in ("приход", "расход", "возврат прихода", "возврат расхода"):
         return True
     for prefix in _NUMBERED_SERVICE_PREFIXES:
@@ -214,6 +343,10 @@ def _is_metadata_line(line: str) -> bool:
     if _is_total_line(line) or _SUMMARY_PATTERN.fullmatch(line):
         return True
     return _is_date_or_time_line(line)
+
+
+def _normalize_table_text(line: str) -> str:
+    return " ".join(cell.strip() for cell in line.strip().strip("|").split("|") if cell.strip())
 
 
 def _is_date_or_time_line(line: str) -> bool:

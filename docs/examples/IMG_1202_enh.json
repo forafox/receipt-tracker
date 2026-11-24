@@ -1,0 +1,43 @@
+{
+  "receipt": {
+    "store": "ИП Дениека О.И.| |",
+    "datetime": "2025-10-16T17:34:00+03:00",
+    "total": "354.00",
+    "items": [
+      {
+        "name": "1 Макароны",
+        "quantity": "1",
+        "price": "69.00",
+        "sum": "69.00"
+      },
+      {
+        "name": "1 Котлета по-Киевски",
+        "quantity": "1",
+        "price": "285.00",
+        "sum": "285.00"
+      }
+    ],
+    "warnings": []
+  },
+  "match": {
+    "store": false,
+    "date": true,
+    "total": true,
+    "item_sum_hits": 2,
+    "item_rows": 2
+  },
+  "target": {
+    "store": "ИП Дейнека О.И.",
+    "date": "16.10.25",
+    "total": "354.00",
+    "items": [
+      "1 Макароны",
+      "1 Котлета по-киевски"
+    ],
+    "item_sums": [
+      "69.00",
+      "285.00"
+    ]
+  },
+  "ocr_seconds": 117.76
+}
