@@ -615,3 +615,41 @@ async def test_concurrent_receipts_are_classified_one_at_a_time() -> None:
     )
 
     assert classifier.max_running == 1
+
+
+class UnparsableRecognizer:
+    name = "unparsable"
+
+    def recognize_blocks(self, image: bytes) -> OcrResult:
+        infinite = float("inf")
+        bbox = [(0.0, 0.0), (infinite, 0.0), (infinite, 10.0), (0.0, 10.0)]
+        return OcrResult(blocks=[TextBlock(text="ИТОГО 10.00", bbox=bbox)])
+
+    def recognize(self, image: bytes) -> str:
+        return "ИТОГО 10.00"
+
+
+async def test_unparsable_ocr_output_is_unreadable() -> None:
+    storage = FakeStorage()
+    pipeline = ReceiptPipeline(UnparsableRecognizer(), storage, MOSCOW_TIMEZONE)
+
+    with pytest.raises(ReceiptUnreadable) as raised:
+        await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert isinstance(raised.value.__cause__, ValueError)
+    assert storage.saved == []
+
+
+async def test_engine_failure_after_unparsable_output_stays_temporary() -> None:
+    failure = OcrEngineUnavailableError("tesseract binary not found")
+    pipeline = ReceiptPipeline(
+        UnparsableRecognizer(),
+        FakeStorage(),
+        MOSCOW_TIMEZONE,
+        recognizers=[UnparsableRecognizer(), FailingRecognizer(failure)],
+    )
+
+    with pytest.raises(RecognitionUnavailable) as raised:
+        await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert raised.value.__cause__ is failure

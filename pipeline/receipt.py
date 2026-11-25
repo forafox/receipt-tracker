@@ -244,7 +244,13 @@ class ReceiptPipeline:
 
         if not candidates:
             if errors:
-                raise errors[-1]
+                last = errors[-1]
+                if isinstance(last, ValueError):
+                    # The engine answered, but its output could not be parsed: from the
+                    # user's side this is an unreadable photo, not a broken service.
+                    logger.warning("OCR output could not be parsed: %s", last)
+                    raise ReceiptUnreadable from last
+                raise last
             msg = "no OCR candidate could be parsed"
             raise RecognitionUnavailable(msg)
 
