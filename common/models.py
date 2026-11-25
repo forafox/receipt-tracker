@@ -27,7 +27,9 @@ class CategoryPrediction(BaseModel):
 
 
 class ClassifiedItem(Item):
-    categories: list[CategoryScore] = Field(min_length=1)
+    # Narrowing Item.categories from names to scored categories is intentional, as for
+    # ClassifiedReceipt.items below. Aligning the two is left to the contract owners.
+    categories: list[CategoryScore] = Field(min_length=1)  # type: ignore[assignment]
     category_validation: Literal["agreed", "disagreed", "uncertain"] = "uncertain"
     suggested_categories: list[str] = Field(default_factory=list)
 

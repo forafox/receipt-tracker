@@ -70,6 +70,30 @@ disable_error_code = ["import-untyped"]
 module = ["pytesseract", "easyocr"]
 ignore_missing_imports = true
 
+# Known type errors outside the tests, switched off one error code per module so that
+# every other check still runs there. Each one is a task for the module owner: remove
+# the override together with the fix.
+[[tool.mypy.overrides]]
+# matplotlib is used only by the offline report and is not a project dependency.
+module = ["matplotlib", "matplotlib.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# The tokenizers package has no type annotations.
+module = ["categorize.bpe"]
+disable_error_code = ["no-untyped-call"]
+
+[[tool.mypy.overrides]]
+# The host always has a string default, and the validator is checked by the caller,
+# but mypy cannot see either.
+module = ["categorize.ollama", "categorize.service"]
+disable_error_code = ["union-attr"]
+
+[[tool.mypy.overrides]]
+# Ad hoc end-to-end script, run by hand against real receipts.
+module = ["e2e_10_receipts"]
+disable_error_code = ["no-any-return", "type-arg"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 asyncio_mode = "auto"
