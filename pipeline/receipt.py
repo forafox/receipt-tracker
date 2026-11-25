@@ -130,6 +130,9 @@ class ReceiptPipeline:
             raise ValueError(msg)
         self._storage = storage
         self._category_service = category_service
+        # The model runs in a worker thread so the bot keeps answering other users, and
+        # one receipt at a time because the tokenizer is not safe for concurrent calls.
+        self._classification_lock = asyncio.Lock()
         self._timezone = timezone
         self._pending_duplicates: dict[int, tuple[int, Receipt, datetime]] = {}
         self._pending_ids = count(1)
@@ -171,7 +174,10 @@ class ReceiptPipeline:
             raise ReceiptUnreadable
         if self._category_service is not None and receipt.items:
             try:
-                classified = self._category_service.classify_receipt(receipt)
+                async with self._classification_lock:
+                    classified = await asyncio.to_thread(
+                        self._category_service.classify_receipt, receipt
+                    )
                 receipt = receipt.model_copy(
                     update={
                         "items": [
