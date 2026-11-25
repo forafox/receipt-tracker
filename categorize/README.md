@@ -151,8 +151,10 @@ python -m categorize.report \
 ## FastAPI
 
 ```bash
-python -m fastapi dev categorize/api.py
+uv run --with uvicorn uvicorn categorize.api:app --host 127.0.0.1 --port 8000
 ```
+
+Swagger UI: http://127.0.0.1:8000/docs. Бот к API не обращается: он загружает модель сам.
 
 | Метод | Путь | Тело | Ответ |
 | ----- | ---- | ---- | ----- |
@@ -164,6 +166,12 @@ python -m fastapi dev categorize/api.py
 Сервис создаётся в `lifespan` через `load_service()`. Если он не инициализирован —
 `503`, ошибки обучения — `400`.
 
+API дополнительно проверяет каждое предсказание локальной моделью Ollama
+(`categorize/ollama.py`, модель `M3_VALIDATION_MODEL`). Категории классификатора не
+меняются; в ответ добавляются `category_validation` (`agreed`, `disagreed` или
+`uncertain`) и `suggested_categories` из известного модели списка категорий. Если
+Ollama недоступна, проверка возвращает `uncertain`. Бот эту проверку не использует.
+
 ## Проверки
 
 ```bash
@@ -173,4 +181,4 @@ mypy categorize
 pytest tests/categorize -q
 ```
 
-Подробные метрики, графики и разбор ошибок — `reports/m3/REPORT.md`.
+Подробные метрики и разбор ошибок — [docs/m3_evaluation.md](../docs/m3_evaluation.md).
