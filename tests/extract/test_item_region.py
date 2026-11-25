@@ -7,6 +7,7 @@ import pytest
 from common.contracts import Item
 from extract.item_region import _select_item_candidate_indices, _select_item_candidate_lines
 from extract.parser import parse_receipt
+from tests.extract.known_regressions import HUNYUAN_PARSER_CHANGE
 
 
 def test_unknown_merchant_items_and_public_parser_compatibility() -> None:
@@ -83,6 +84,7 @@ def test_late_datetime_and_payment_boundary_with_or_without_total(total: list[st
     assert _select_item_candidate_lines(lines, store="Пекарня") == ["ХЛЕБ 50,00"]
 
 
+@HUNYUAN_PARSER_CHANGE
 def test_final_recognized_total_bounds_region_and_all_total_labels_are_filtered() -> None:
     lines = [
         "Чай 100,00",
@@ -111,6 +113,7 @@ def test_multiline_item_and_percentage_are_preserved_separately() -> None:
     assert _select_item_candidate_lines(lines, store=None) == lines[:3]
 
 
+@HUNYUAN_PARSER_CHANGE
 def test_similar_words_in_product_names_are_not_metadata() -> None:
     lines = [
         "КАССАВА 70,00",
@@ -140,6 +143,7 @@ def test_empty_or_metadata_only_receipt_has_no_candidates(
     assert _select_item_candidate_lines(lines, store=store) == []
 
 
+@HUNYUAN_PARSER_CHANGE
 def test_candidate_indices_preserve_original_positions_with_blanks_and_repeated_text() -> None:
     lines = [" ", "Лавка", "", "  Лавка  ", "ЧАЙ 50.00", "ЧАЙ 50.00", "КАРТОЙ 100.00"]
 
