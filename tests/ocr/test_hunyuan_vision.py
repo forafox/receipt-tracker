@@ -22,9 +22,7 @@ def test_hunyuan_returns_one_synthetic_block_per_transcript_row(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     response = BytesIO(
-        json.dumps(
-            {"choices": [{"message": {"content": "МАГАЗИН\n\nИТОГО 250,00"}}]}
-        ).encode()
+        json.dumps({"choices": [{"message": {"content": "МАГАЗИН\n\nИТОГО 250,00"}}]}).encode()
     )
     captured: dict[str, object] = {}
 

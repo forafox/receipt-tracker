@@ -12,8 +12,8 @@ from ocr.core.ordering import blocks_to_text
 from ocr.core.postprocess import PostprocessSettings
 from ocr.core.quality import QualityThresholds
 from ocr.engines.easyocr import EasyOcrEngine
-from ocr.engines.hunyuan_vision import HunyuanVisionEngine
 from ocr.engines.factory import build_ocr_engine, build_ocr_engines
+from ocr.engines.hunyuan_vision import HunyuanVisionEngine
 from ocr.engines.tesseract import TesseractEngine
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
