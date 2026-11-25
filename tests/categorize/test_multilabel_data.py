@@ -89,10 +89,10 @@ def test_build_merges_counterexamples_and_groups(tmp_path: Path) -> None:
         noise_fraction=0.0,
     )
 
-    rows = list(csv.DictReader(output.open(encoding="utf-8")))
+    written = list(csv.DictReader(output.open(encoding="utf-8")))
     assert stats["multilabel_rows"]
-    assert all(row["group_id"] for row in rows)
-    assert {"text", "category", "source", "group_id"} == set(rows[0])
+    assert all(row["group_id"] for row in written)
+    assert {"text", "category", "source", "group_id"} == set(written[0])
 
 
 def test_build_adds_bpe_noise_variants(tmp_path: Path) -> None:

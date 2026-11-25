@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sized
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import cast
 
 import pytest
 import torch
@@ -43,7 +45,7 @@ class _FakeModel:
         return self
 
     def __call__(self, **_: object) -> _FakeOutput:
-        batch_size = len(_.get("input_ids", [0]))
+        batch_size = len(cast(Sized, _.get("input_ids", [0])))
         return _FakeOutput(self._logits.repeat(batch_size, 1))
 
 
