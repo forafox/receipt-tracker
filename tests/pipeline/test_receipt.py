@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from categorize.service import CategoryService
+from common import CategoryPrediction, CategoryScore
 from common.contracts import Item, Receipt
 from common.ocr import OcrResult, TextBlock
 from ocr import ImageDecodeError, ImageQualityError, ImageTooLargeError, OcrEngineUnavailableError
@@ -506,3 +508,55 @@ async def test_oversized_image_is_reported_separately_from_unreadable() -> None:
         await pipeline.process_photo(1, b"image", RECEIVED_AT)
 
     assert storage.saved == []
+
+
+CATEGORY_TEXT = (
+    "ПЯТЁРОЧКА\n"
+    "05.10.2026 18:20\n"
+    "МОЛОКО 3.2%      89.90\n"
+    "ШАМПУНЬ          45.00\n"
+    "ИТОГО           134.90"
+)
+
+
+class FakeClassifier:
+    def __init__(self, categories: dict[str, str] | None) -> None:
+        self.categories = categories
+
+    def predict(self, item_name: str) -> CategoryPrediction:
+        if self.categories is None:
+            raise RuntimeError("model failed")
+        category = self.categories[item_name]
+        return CategoryPrediction(categories=[CategoryScore(category=category, confidence=0.9)])
+
+
+async def test_items_are_categorized_before_saving() -> None:
+    storage = FakeStorage()
+    classifier = FakeClassifier({"МОЛОКО 3.2%": "food", "ШАМПУНЬ": "personal_care"})
+    pipeline = ReceiptPipeline(
+        FakeRecognizer(CATEGORY_TEXT),
+        storage,
+        MOSCOW_TIMEZONE,
+        category_service=CategoryService(classifier),
+    )
+
+    receipt = await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert [item.categories for item in receipt.items] == [["food"], ["personal_care"]]
+    assert storage.saved[0][1] == receipt
+
+
+async def test_receipt_is_saved_without_categories_when_classifier_fails() -> None:
+    storage = FakeStorage()
+    pipeline = ReceiptPipeline(
+        FakeRecognizer(CATEGORY_TEXT),
+        storage,
+        MOSCOW_TIMEZONE,
+        category_service=CategoryService(FakeClassifier(None)),
+    )
+
+    receipt = await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert [item.name for item in receipt.items] == ["МОЛОКО 3.2%", "ШАМПУНЬ"]
+    assert [item.categories for item in receipt.items] == [[], []]
+    assert len(storage.saved) == 1
