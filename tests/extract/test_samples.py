@@ -54,7 +54,9 @@ def test_load_validates_contracts_without_inferring_or_normalizing(tmp_path: Pat
         "store": " Лавка ",
         "datetime": "2026-10-05T18:20:00+03:00",
         "total": "0.12345678901234567890123456789",
-        "items": [{"name": " Milk ", "quantity": None, "price": None, "sum": "-1.00"}],
+        "items": [
+            {"name": " Milk ", "quantity": None, "price": None, "sum": "-1.00", "categories": []}
+        ],
         "warnings": ["independent_annotation"],
     }
     # Exercise a JSON number beyond float precision.
@@ -83,6 +85,7 @@ def test_load_validates_contracts_without_inferring_or_normalizing(tmp_path: Pat
         "quantity": None,
         "price": None,
         "sum": Decimal("-1.00"),
+        "categories": [],
     }
     assert sample.expected.warnings == ["independent_annotation"]
     assert path.read_bytes() == before
@@ -116,10 +119,16 @@ def test_missing_receipt_annotations_are_rejected(tmp_path: Path, field: str) ->
     assert field in str(caught.value)
 
 
-@pytest.mark.parametrize("field", ["name", "quantity", "price", "sum"])
+@pytest.mark.parametrize("field", ["name", "quantity", "price", "sum", "categories"])
 def test_missing_item_annotations_are_rejected(tmp_path: Path, field: str) -> None:
     record = _record()
-    item = {"name": "Milk", "quantity": None, "price": None, "sum": "1"}
+    item: dict[str, object] = {
+        "name": "Milk",
+        "quantity": None,
+        "price": None,
+        "sum": "1",
+        "categories": [],
+    }
     del item[field]
     record["expected"]["items"] = [item]
     path = tmp_path / "missing-item.jsonl"

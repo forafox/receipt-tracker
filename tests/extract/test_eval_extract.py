@@ -27,7 +27,15 @@ def _record(sample_id: str, *, matching: bool = True) -> dict[str, Any]:
             "store": "Лавка" if matching else "Other shop",
             "datetime": "2026-10-05T18:20:00+03:00",
             "total": "50.00" if matching else None,
-            "items": [{"name": "МОЛОКО", "quantity": None, "price": None, "sum": "50.00"}]
+            "items": [
+                {
+                    "name": "МОЛОКО",
+                    "quantity": None,
+                    "price": None,
+                    "sum": "50.00",
+                    "categories": [],
+                }
+            ]
             if matching
             else [],
             "warnings": [],
