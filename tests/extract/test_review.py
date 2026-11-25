@@ -10,10 +10,7 @@ from pytest import MonkeyPatch
 from extract import review
 
 MOSCOW = ZoneInfo("Europe/Moscow")
-TEXT = (
-    "ПЯТЁРОЧКА\n05.10.2026 18:20\nМОЛОКО 3,2% 89.99\n"
-    "ХЛЕБ БОРОДИНСКИЙ 45.00\nИТОГО 134.99"
-)
+TEXT = "ПЯТЁРОЧКА\n05.10.2026 18:20\nМОЛОКО 3,2% 89.99\nХЛЕБ БОРОДИНСКИЙ 45.00\nИТОГО 134.99"
 
 
 class _Response:
@@ -43,7 +40,7 @@ def _fake_reply(monkeypatch: MonkeyPatch, corrected: str, verdict: str = "correc
     monkeypatch.setattr(review, "urlopen", lambda *args, **kwargs: _Response(content))
 
 
-def test_review_returns_model_verdict_and_deterministic_parse(monkeypatch) -> None:
+def test_review_returns_model_verdict_and_deterministic_parse(monkeypatch: MonkeyPatch) -> None:
     _fake_reply(monkeypatch, TEXT)
 
     result = review.review_receipt_text(TEXT, timezone=MOSCOW)
@@ -52,12 +49,10 @@ def test_review_returns_model_verdict_and_deterministic_parse(monkeypatch) -> No
     assert result.safe_to_apply
     assert result.numeric_tokens_preserved
     assert result.original_receipt.total == Decimal("134.99")
-    assert result.original_receipt.datetime == datetime(
-        2026, 10, 5, 18, 20, tzinfo=MOSCOW
-    )
+    assert result.original_receipt.datetime == datetime(2026, 10, 5, 18, 20, tzinfo=MOSCOW)
 
 
-def test_review_rejects_suggestion_that_changes_digits(monkeypatch) -> None:
+def test_review_rejects_suggestion_that_changes_digits(monkeypatch: MonkeyPatch) -> None:
     _fake_reply(monkeypatch, TEXT.replace("89.99", "99.99"))
 
     result = review.review_receipt_text(TEXT, timezone=MOSCOW)
@@ -66,7 +61,7 @@ def test_review_rejects_suggestion_that_changes_digits(monkeypatch) -> None:
     assert not result.safe_to_apply
 
 
-def test_uncertain_model_cannot_mark_text_safe(monkeypatch) -> None:
+def test_uncertain_model_cannot_mark_text_safe(monkeypatch: MonkeyPatch) -> None:
     _fake_reply(monkeypatch, TEXT, verdict="uncertain")
 
     result = review.review_receipt_text(TEXT, timezone=MOSCOW)
