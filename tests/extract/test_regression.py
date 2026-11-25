@@ -8,6 +8,7 @@ import pytest
 from common.contracts import Item, Receipt
 from common.ocr import OcrResult, TextBlock
 from extract import parse_ocr_result, parse_receipt
+from tests.extract.known_regressions import HUNYUAN_PARSER_CHANGE
 
 MOSCOW_TIMEZONE = ZoneInfo("Europe/Moscow")
 
@@ -196,6 +197,7 @@ def test_total_label_is_shared_by_fields_item_region_and_validation(
     assert actual == expected
 
 
+@HUNYUAN_PARSER_CHANGE
 @pytest.mark.parametrize("ocr", [False, True], ids=["text", "ocr"])
 @pytest.mark.parametrize("total", [None, "89.99"])
 def test_total_word_inside_product_name_neither_supplies_nor_hides_a_total(

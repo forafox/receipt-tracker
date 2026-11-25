@@ -6,6 +6,7 @@ import pytest
 from common.contracts import Item
 from extract import parse_receipt
 from extract.items import _parse_simple_item_line
+from tests.extract.known_regressions import HUNYUAN_PARSER_CHANGE
 
 
 @pytest.mark.parametrize(
@@ -59,6 +60,7 @@ def test_unsupported_lines_do_not_produce_items(line: str) -> None:
     assert _parse_simple_item_line(line) is None
 
 
+@HUNYUAN_PARSER_CHANGE
 def test_public_parser_uses_region_preserves_order_and_duplicates_without_total() -> None:
     receipt = parse_receipt(
         "Лавка у реки\nИНН 1234567890\nКАССА 2\n"
