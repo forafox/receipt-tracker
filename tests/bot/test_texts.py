@@ -46,8 +46,7 @@ def test_format_monthly_summary_includes_category_spending() -> None:
     )
 
     assert format_monthly_summary(summary, RU) == (
-        "Расходы за 10.2026: 300.00\nЧеков: 2\nПо категориям:\n"
-        "- food: 200.00\n- household: 100.00"
+        "Расходы за 10.2026: 300.00\nЧеков: 2\nПо категориям:\n- food: 200.00\n- household: 100.00"
     )
 
 

@@ -78,7 +78,7 @@ def build_ocr_engines(settings: OcrSettings | None = None) -> list[OcrEngine]:
                 model=resolved.hunyuan_ocr_model,
                 url=resolved.hunyuan_ocr_url,
                 timeout_seconds=resolved.hunyuan_ocr_timeout_seconds,
-            )
+            ),
         )
     return engines
 
