@@ -1,5 +1,8 @@
+import asyncio
 import logging
 import re
+import threading
+import time
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -560,3 +563,55 @@ async def test_receipt_is_saved_without_categories_when_classifier_fails() -> No
     assert [item.name for item in receipt.items] == ["МОЛОКО 3.2%", "ШАМПУНЬ"]
     assert [item.categories for item in receipt.items] == [[], []]
     assert len(storage.saved) == 1
+
+
+class RecordingClassifier:
+    """Records the thread of each prediction and how many run at the same time."""
+
+    def __init__(self) -> None:
+        self.threads: set[int] = set()
+        self.running = 0
+        self.max_running = 0
+        self._lock = threading.Lock()
+
+    def predict(self, item_name: str) -> CategoryPrediction:
+        with self._lock:
+            self.running += 1
+            self.max_running = max(self.max_running, self.running)
+            self.threads.add(threading.get_ident())
+        time.sleep(0.05)
+        with self._lock:
+            self.running -= 1
+        return CategoryPrediction(categories=[CategoryScore(category="food", confidence=0.9)])
+
+
+async def test_classification_runs_outside_the_event_loop_thread() -> None:
+    classifier = RecordingClassifier()
+    pipeline = ReceiptPipeline(
+        FakeRecognizer(CATEGORY_TEXT),
+        FakeStorage(),
+        MOSCOW_TIMEZONE,
+        category_service=CategoryService(classifier),
+    )
+
+    await pipeline.process_photo(1, b"image", RECEIVED_AT)
+
+    assert classifier.threads
+    assert threading.get_ident() not in classifier.threads
+
+
+async def test_concurrent_receipts_are_classified_one_at_a_time() -> None:
+    classifier = RecordingClassifier()
+    pipeline = ReceiptPipeline(
+        FakeRecognizer(CATEGORY_TEXT),
+        FakeStorage(),
+        MOSCOW_TIMEZONE,
+        category_service=CategoryService(classifier),
+    )
+
+    await asyncio.gather(
+        pipeline.process_photo(1, b"image", RECEIVED_AT),
+        pipeline.process_photo(2, b"image", RECEIVED_AT),
+    )
+
+    assert classifier.max_running == 1
