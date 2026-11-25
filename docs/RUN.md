@@ -432,9 +432,6 @@ Notes:
 
 ## 9. Start the Telegram bot
 
-For the short WSL launch command with Hunyuan enabled, see
-[`bot.md`](bot.md).
-
 In the first terminal (repository root, where `.env` lives):
 
 ```bash

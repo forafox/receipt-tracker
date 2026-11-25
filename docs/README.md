@@ -24,11 +24,8 @@
 | `architecture.jpg`, `architecture.pdf` | команда | первая схема системы (итерация 0) | исторический, сравнивать с текущим устройством |
 | [m4/README.md](m4/README.md) | M4 | журнал разработки M4 по итерациям | ведётся |
 | [m3_evaluation.md](m3_evaluation.md) | M3 | данные, обучение и метрики классификатора | отчёт |
-| [m3_categorize.md](m3_categorize.md) | M3 | описание модуля M3 | во многом повторяет `categorize/README.md` |
 | [hunyuanocr_evaluation.md](hunyuanocr_evaluation.md) | M3 | сравнение Hunyuan OCR и Tesseract на 10 чеках | отчёт |
 | [e2e_10_receipts.md](e2e_10_receipts.md) | M3 | разбор правилами против Ollama на 10 чеках | отчёт |
 | [examples/](examples/README.md) | M3 | 10 фото чеков с результатами распознавания | данные к отчётам |
-| [HANDOFF.md](HANDOFF.md) | M3 | передача контекста по ветке `uvusibuneka` | частично устарел: числа тестов и состояние на момент написания |
-| [bot.md](bot.md) | M3 | запуск конкретного экземпляра бота в WSL с Hunyuan | личная заметка, общая инструкция в `RUN.md` |
 
 Рабочие заметки M3 лежат рядом с кодом: `categorize/PROGRESS.md` и `categorize/DATASET_RESEARCH_M3.md`.
