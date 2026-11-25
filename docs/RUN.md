@@ -11,13 +11,13 @@ classifier API.
 
 | Process | Command | Responsibility |
 | --- | --- | --- |
-| Bot (M4) | `uv run python -m bot` | Telegram polling, M1 OCR, M2 extraction, SQLite storage |
-| Categorizer (M3) | `uv run --with uvicorn uvicorn categorize.api:app ...` | FastAPI `/classify`, `/classify/items`, `/classify/receipt`, `/train` |
+| Bot (M4) | `uv run python -m bot` | Telegram polling, M1 OCR, M2 extraction, M3 categories, SQLite storage |
+| Categorizer API (M3, optional) | `uv run --with uvicorn uvicorn categorize.api:app ...` | FastAPI `/classify`, `/classify/items`, `/classify/receipt`, `/train` |
 
-At the time of writing, the bot pipeline does **not** call the M3 API. Running
-both processes gives you a working bot and a working classifier service, but
-the bot's replies do not contain categories yet. M3 is used over HTTP by other
-clients (or manually through Swagger UI).
+The bot loads the M3 model itself at startup and adds categories to receipt
+items, so the bot alone is a complete setup. The M3 API is a separate service
+for other clients and for manual checks through Swagger UI; the bot does not
+call it.
 
 The trained M3 model is committed to the repository at
 `categorize/models/category_transformer/`, so no training is required for a
@@ -273,6 +273,16 @@ token: True tz: Europe/Moscow db: receipts.sqlite
 Both the bot and OCR read the same `.env`; each module ignores variables that
 belong to the other one.
 
+Check these optional settings before the first start:
+
+- `OCR_HUNYUAN_OCR_ENABLED` is `true` in `.env.example`. Without a local Hunyuan
+  server (section 5) the bot tries to reach it for every receipt before it falls
+  back to Tesseract. Set it to `false` if you do not run that server.
+- `KILO_API_KEY` sends the OCR text of every receipt to the external OpenKilo
+  service (`extract/agent.py`). Leave it empty to keep receipts on your machine.
+- `BOT_API_PROXY` is needed only when the machine cannot reach `api.telegram.org`
+  directly, for example `http://127.0.0.1:12334`.
+
 ## 7. Verify the installation before starting
 
 Run the project checks:
@@ -496,6 +506,10 @@ and change the `CMD` accordingly, then build and run it. That path is not
 covered by this guide.
 
 ## 13. What was verified in this checkout
+
+This table records the check made when this guide was written, before the
+Hunyuan OCR and Ollama changes. For the current state of `make check`, see
+"Известные проблемы" in the root `README.md`.
 
 | Step | Result |
 | --- | --- |
