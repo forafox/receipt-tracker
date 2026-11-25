@@ -438,7 +438,7 @@ Available commands:
 
 - `/start` — greeting;
 - `/help` — help;
-- `/month` — current month's total and receipt count;
+- `/month` — current month's total and receipt count; `/month MM.YYYY` — for a selected month (for example, `/month 11.2025`);
 - `/history` — last five receipts;
 - `/undo` — delete the most recently saved receipt;
 - a photo or an image file — recognize, parse and save a receipt.

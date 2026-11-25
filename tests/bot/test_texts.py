@@ -34,7 +34,7 @@ def test_format_receipt_marks_missing_fields() -> None:
 def test_format_monthly_summary_without_receipts() -> None:
     summary = MonthlySummary(month=date(2026, 10, 1), receipt_count=0, total=Decimal(0))
 
-    assert format_monthly_summary(summary, EN) == EN.month_empty
+    assert format_monthly_summary(summary, EN) == "No receipts in the selected month yet: 10.2026."
 
 
 def test_format_monthly_summary_includes_category_spending() -> None:

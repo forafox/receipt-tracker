@@ -152,6 +152,7 @@ async def _run(model_path: Path, examples_path: Path, report_path: Path | None) 
         month_responses = []
         for month_key, moment in sorted(months.items()):
             message = _message(moment)
+            message.text = f"/month {moment.astimezone(ZoneInfo('Europe/Moscow')):%m.%Y}"
             await handle_month(message, pipeline, RU)
             message.answer.assert_awaited_once()
             response = message.answer.await_args.args[0]

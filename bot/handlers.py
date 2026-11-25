@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from io import BytesIO
 
 from aiogram import Bot, F, Router
@@ -66,7 +67,7 @@ async def handle_help(message: Message, texts: Texts) -> None:
 
 @router.message(Command("month"))
 async def handle_month(message: Message, service: ReceiptService, texts: Texts) -> None:
-    """Send the current user's spending for the current month.
+    """Send monthly spending, optionally for an explicit ``MM.YYYY`` month.
 
     Args:
         message: Incoming Telegram month-command message.
@@ -75,7 +76,16 @@ async def handle_month(message: Message, service: ReceiptService, texts: Texts) 
     """
     if message.from_user is None:
         return
-    summary = await service.monthly_summary(message.from_user.id, message.date)
+    arguments = (message.text or "").partition(" ")[2].strip()
+    moment = message.date
+    if arguments:
+        try:
+            selected = datetime.strptime(arguments, "%m.%Y")
+        except ValueError:
+            await message.answer(texts.month_invalid)
+            return
+        moment = selected.replace(tzinfo=message.date.tzinfo)
+    summary = await service.monthly_summary(message.from_user.id, moment)
     await message.answer(format_monthly_summary(summary, texts))
 
 

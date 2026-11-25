@@ -24,6 +24,7 @@ class Texts:
         image_too_large: Reply sent when an image is too large to recognize.
         recognition_unavailable: Reply sent when text recognition is temporarily failing.
         month_empty: Reply sent when no receipts were saved this month.
+        month_invalid: Guidance shown when the requested month has an invalid format.
         month_spending: Label for the monthly spending.
         history_empty: Reply sent when the user has no saved receipts.
         history_title: Heading of the recent receipts list.
@@ -58,6 +59,7 @@ class Texts:
     image_too_large: str
     recognition_unavailable: str
     month_empty: str
+    month_invalid: str
     month_spending: str
     category_spending: str
     history_empty: str
@@ -83,7 +85,7 @@ RU = Texts(
     help=(
         "Отправьте фото чека, чтобы сохранить покупку. "
         "Если отправить его файлом, качество будет выше.\n"
-        "/month — расходы за текущий месяц\n"
+        "/month — расходы за текущий месяц; /month MM.YYYY — за выбранный месяц\n"
         "/history — последние чеки\n"
         "/undo — удалить последний сохранённый чек\n"
         "/help — эта справка"
@@ -100,7 +102,8 @@ RU = Texts(
     file_too_large="Файл больше 20 МБ, такой бот скачать не может. Пришлите фото поменьше.",
     image_too_large="Изображение слишком большое для распознавания. Уменьшите его и пришлите.",
     recognition_unavailable="Распознавание временно недоступно. Попробуйте через несколько минут.",
-    month_empty="В этом месяце чеков пока нет.",
+    month_empty="За выбранный месяц чеков пока нет",
+    month_invalid="Формат: /month MM.YYYY, например /month 11.2025.",
     month_spending="Расходы за",
     category_spending="По категориям",
     history_empty="Сохранённых чеков пока нет.",
@@ -119,7 +122,7 @@ RU = Texts(
     items_incomplete="Часть покупок распознать не удалось, список может быть неполным.",
     not_found="не распознано",
     help_command="Справка",
-    month_command="Расходы за месяц",
+    month_command="Расходы за месяц или MM.YYYY",
     history_command="Последние чеки",
     undo_command="Удалить последний чек",
 )
@@ -130,7 +133,7 @@ EN = Texts(
     help=(
         "Send a photo of a receipt to save the purchase. "
         "Sending it as a file keeps the quality higher.\n"
-        "/month — spending for the current month\n"
+        "/month — spending for the current month; /month MM.YYYY — for a selected month\n"
         "/history — recent receipts\n"
         "/undo — delete the last saved receipt\n"
         "/help — this message"
@@ -147,7 +150,8 @@ EN = Texts(
     file_too_large="The file is larger than 20 MB and cannot be downloaded. Send a smaller image.",
     image_too_large="The image is too large to recognize. Resize it and send it again.",
     recognition_unavailable="Recognition is temporarily unavailable. Try again in a few minutes.",
-    month_empty="No receipts this month yet.",
+    month_empty="No receipts in the selected month yet",
+    month_invalid="Format: /month MM.YYYY, for example /month 11.2025.",
     month_spending="Spending for",
     category_spending="By category",
     history_empty="No saved receipts yet.",
@@ -166,7 +170,7 @@ EN = Texts(
     items_incomplete="Some items could not be recognized, the list may be incomplete.",
     not_found="not recognized",
     help_command="Help",
-    month_command="Spending this month",
+    month_command="Spending for a month or MM.YYYY",
     history_command="Recent receipts",
     undo_command="Delete the last receipt",
 )
@@ -225,7 +229,7 @@ def format_monthly_summary(summary: MonthlySummary, texts: Texts) -> str:
         Message with the month total and the number of receipts.
     """
     if summary.receipt_count == 0:
-        return texts.month_empty
+        return f"{texts.month_empty}: {summary.month:%m.%Y}."
     return (
         f"{texts.month_spending} {summary.month:%m.%Y}: {summary.total:.2f}\n"
         f"{texts.receipt_count}: {summary.receipt_count}"

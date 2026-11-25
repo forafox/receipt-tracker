@@ -67,13 +67,18 @@ class FakeService:
 
     async def monthly_summary(self, user_id: int, moment: datetime) -> MonthlySummary:
         self.received_month = (user_id, moment)
-        return MonthlySummary(month=date(2026, 10, 1), receipt_count=2, total=Decimal("300"))
+        return MonthlySummary(
+            month=date(moment.year, moment.month, 1),
+            receipt_count=2,
+            total=Decimal("300"),
+        )
 
 
 def make_message() -> MagicMock:
     message = MagicMock()
     message.from_user.id = 42
     message.date = SENT_AT
+    message.text = "/month"
     message.photo = [MagicMock(), MagicMock()]
     message.answer = AsyncMock()
     return message
@@ -105,6 +110,28 @@ async def test_month_sends_summary_for_message_time() -> None:
 
     assert service.received_month == (42, SENT_AT)
     message.answer.assert_awaited_once_with("Расходы за 10.2026: 300.00\nЧеков: 2")
+
+
+async def test_month_accepts_explicit_month_and_year() -> None:
+    message = make_message()
+    message.text = "/month 11.2025"
+    service = FakeService()
+
+    await handle_month(message, service, RU)
+
+    assert service.received_month == (42, datetime(2025, 11, 1, tzinfo=ZoneInfo("UTC")))
+    message.answer.assert_awaited_once_with("Расходы за 11.2025: 300.00\nЧеков: 2")
+
+
+async def test_month_rejects_invalid_period() -> None:
+    message = make_message()
+    message.text = "/month november"
+    service = FakeService()
+
+    await handle_month(message, service, RU)
+
+    assert service.received_month is None
+    message.answer.assert_awaited_once_with(RU.month_invalid)
 
 
 async def test_photo_passes_largest_size_to_service() -> None:
